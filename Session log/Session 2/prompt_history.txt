@@ -1,1 +1,15 @@
 1. my last session got stuck. can you pick up where we left off
+
+2. Can you see how messed up this dashboard is? I want a "Now Closing" card,
+   and then a "Next Up" card. And then below it, I want all the items and
+   tickets in columns from top down, then right to left
+   [+ screenshot of the broken/overlapping dashboard]
+   [Clarifying answer: column fill = "Top-down, left-to-right"]
+
+3. I don't want the name of the High Bidder displayed anywhere on the dashboard.
+   Remove that. I don't have good clarity of how the dashboard works yet. I see
+   the "Now closing" card that starts counting down from 24:00:00 and runs until
+   23:59:58 then jumps back to 24:00:00. It feels like it isn't honoring the
+   Close Time we set in the sheet. [+ pasted 10 item rows whose Close Time cells
+   read like "Thursday, June 11, 2026 at 5:30:00 PM"]. It should be counting
+   down to 5:30 PM for ITEM 1 (E-Bike), not showing "at 4:55pm".

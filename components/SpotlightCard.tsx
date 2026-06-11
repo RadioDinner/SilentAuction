@@ -9,7 +9,6 @@ export interface SpotEntry {
   /** Secondary line (item description, or ticket "#3 of 12"). */
   sub?: string;
   bid?: number;
-  bidder?: string;
   closeISO: string;
   secondsLeft: number;
   imageUrl?: string;
@@ -95,7 +94,6 @@ export function SpotlightCard({
               High Bid
             </div>
             <div className="text-6xl font-black text-white">{formatMoney(entry.bid)}</div>
-            {entry.bidder && <div className="mt-1 truncate text-2xl text-slate-300">{entry.bidder}</div>}
           </div>
           <div className="shrink-0 text-right">
             <div className="text-lg font-semibold uppercase tracking-wider text-slate-300">

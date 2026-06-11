@@ -111,3 +111,44 @@ e. STILL OPEN / FOR THE USER
     and event_date (guessed 2026-07-18); then deploy on Vercel (docs/SETUP_GUIDE.md).
   - Possible future: append NEW items/tickets/config keys from the console (today
     they're reported, not created); per-item "featured" write via the Items tab.
+
+
+ADDENDUM (prompt 2) — DASHBOARD LAYOUT REDESIGN
+-----------------------------------------------
+- The old layout (FeaturedItem hero + spotlight TicketPanel + TicketGroupSummary
+  cards) visually broke: the ticket panel overflowed and overlapped the summary
+  cards. User asked for a "Now Closing" card + "Next Up" card, then all items and
+  tickets listed in columns. Clarifying Q: column fill = top-down, LEFT-to-right.
+- Rebuilt:
+    * components/SpotlightCard.tsx (new) — one card; variant "now" (red) / "next"
+      (sky). Optional image background.
+    * components/DashboardView.tsx — builds ONE timeline merging items + open
+      tickets, sorted by soonest effective close; entry[0] -> Now Closing,
+      entry[1] -> Next Up.
+    * components/BidList.tsx — now CSS multi-column (columns-* + break-inside-
+      avoid) so it fills top-down then left-to-right.
+    * DELETED FeaturedItem.tsx, TicketPanel.tsx, TicketGroupSummary.tsx (unused).
+- Verified with a 1920x1080 puppeteer screenshot (demo data) — clean, no overlap.
+- Note: dropping the FeaturedItem hero means config.featuredItemId / item.featured
+  no longer drive a spotlight (spotlight is purely soonest-close now).
+
+ADDENDUM (prompt 3) — REMOVE BIDDER + FIX CLOSE-TIME PARSING (important)
+----------------------------------------------------------------------
+- REMOVE HIGH BIDDER from the dashboard: dropped the bidder line + SpotEntry.bidder
+  field from SpotlightCard and stopped populating it in DashboardView. (BidList
+  never showed it.) The /admin console STILL edits High Bidder — staff need it to
+  record bids; the user's request was about the public dashboard only.
+- ROOT CAUSE of the "counts down from 24:00:00 and resets" bug: the user's sheet
+  stores Close Time as Google Sheets' long display, e.g.
+  "Thursday, June 11, 2026 at 5:30:00 PM". parseSheetTime (lib/time.ts) had no
+  matching format, returned undefined, so parseItems fell back to farFuture =
+  now + 24h — recomputed every /api/state poll, hence the ~23:59:5x that resets.
+- FIX (lib/time.ts): added the Sheets long-date formats (with/without weekday,
+  the literal 'at', and seconds) to DATETIME_FORMATS, and normalized whitespace
+  (collapse \s+, which in JS includes U+00A0 and U+202F that Sheets emits before
+  AM/PM) before matching. New lib/time.test.ts (8 tests) locks this in, incl. the
+  exact pasted string and an NBSP/narrow-NBSP case.
+- After the fix the featured/closing countdowns honor the real Close Time and the
+  "at H:MM PM" line shows the real close clock. 44 tests pass, build clean.
+- STILL relevant: confirm Config timezone + event_date so anchoring is right; the
+  tickets need cascade-start times in the same (now-supported) format or a clock.

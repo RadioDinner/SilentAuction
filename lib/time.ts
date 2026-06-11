@@ -1,7 +1,8 @@
 // Timezone-aware parsing of the loose time values people type into a sheet.
 //
-// Staff enter close times as plain clock times ("5:30 PM"), and the Apps
-// Script stamps bid times as full ISO strings. This turns either into a single
+// Staff enter close times as plain clock times ("5:30 PM") or full dates pasted
+// from Google Sheets ("Thursday, June 11, 2026 at 5:30:00 PM"); the Apps Script
+// stamps bid times as full ISO strings. This turns any of them into a single
 // canonical ISO string (with offset) anchored to the event's timezone.
 
 import { DateTime } from "luxon";
@@ -14,6 +15,16 @@ const DATETIME_FORMATS = [
   "M/d/yyyy H:mm:ss",
   "M/d/yyyy H:mm",
   "M/d/yy h:mm a",
+  // Google Sheets' long date display, e.g. "Thursday, June 11, 2026 at 5:30:00 PM"
+  // (with and without the weekday, the literal "at", and the seconds).
+  "EEEE, MMMM d, yyyy 'at' h:mm:ss a",
+  "EEEE, MMMM d, yyyy 'at' h:mm a",
+  "MMMM d, yyyy 'at' h:mm:ss a",
+  "MMMM d, yyyy 'at' h:mm a",
+  "EEEE, MMMM d, yyyy h:mm:ss a",
+  "EEEE, MMMM d, yyyy h:mm a",
+  "MMMM d, yyyy h:mm:ss a",
+  "MMMM d, yyyy h:mm a",
 ];
 
 const TIME_ONLY_FORMATS = [
@@ -39,7 +50,10 @@ export function parseSheetTime(
   tz: string,
 ): string | undefined {
   if (raw === null || raw === undefined) return undefined;
-  const s = String(raw).trim();
+  // Collapse any whitespace — including the non-breaking / narrow no-break
+  // spaces Sheets and some locales emit before AM/PM — to single plain spaces,
+  // so the format strings below can match. JS \s covers U+00A0 and U+202F.
+  const s = String(raw).replace(/\s+/g, " ").trim();
   if (!s) return undefined;
 
   // 1) Already ISO 8601 (Apps Script stamps, or anyone pasting ISO).
