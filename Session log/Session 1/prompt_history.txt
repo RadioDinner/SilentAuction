@@ -22,3 +22,5 @@ I want to host the auction data in a google sheet, where our staff will be takin
   Q2 (Ticket order): "Highest closes first"
   Q3 (Ticket timing): "Auto, fixed length"
 
+2. merge to main to start, help with the vercel project
+

@@ -1,0 +1,9 @@
+Key,Value
+event_name,Company Picnic Silent Auction
+timezone,America/Chicago
+event_date,2026-08-15
+extension_window_seconds,60
+ticket_cascade_start,6:00 PM
+ticket_countdown_seconds,180
+urgent_threshold_seconds,120
+featured_item_id,

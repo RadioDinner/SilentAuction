@@ -86,6 +86,10 @@ npm test
 
 ## Connect your Google Sheet
 
+> **New to this?** Follow the click-by-click
+> [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) — it covers everything below from
+> scratch, including an importable sheet template in `docs/sheet-template/`.
+
 ### 1. Build the sheet
 Create a Google Sheet with three tabs — `Items`, `Tickets`, `Config` — following
 [`docs/SHEET_TEMPLATE.md`](docs/SHEET_TEMPLATE.md).
