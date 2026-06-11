@@ -177,3 +177,25 @@ ADDENDUM (later in Session 1)
 - STILL OPEN: user to send exact close times + cascade starts, confirm
   timezone/event_date, confirm the spectator-ticket grouping, then deploy +
   wire Google creds (SETUP_GUIDE.md). Build + 19 tests green.
+
+ADMIN / TEST CONSOLE (prompt 4)
+-------------------------------
+- User decision (Q&A): "Both (test now, live later)" — build an in-browser test
+  console now; add Google Sheet WRITE-BACK for live shared control later (Phase 2,
+  NOT yet built).
+- Built Phase 1:
+    * components/DashboardView.tsx — extracted the dashboard render so it's reused
+      by both / and the admin preview (page.tsx now just polls + renders it).
+    * app/page.tsx — adds a ⚙ gear button (adminHref="/admin") to the dashboard.
+    * app/admin/page.tsx — the console: edit items/tickets/config, simulate bids
+      (+$ buttons stamp lastBid=preview-now to trigger anti-snipe/cascade),
+      fast-forward clock (+30s..+15m via shiftMs), Reset/Reload from source, and a
+      LIVE PREVIEW (right pane) computed in-browser with the pure computeState().
+      Edits persist to localStorage ("auction-admin-data-v1"); browser-local only,
+      does NOT affect the live dashboard or the sheet.
+- Verified: build clean, 19 tests pass, screenshot + interaction test (placing a
+  +$100 bid moved preview $1,500->$1,600; +30m fast-forward closed items and
+  switched the featured item / closed the ticket group).
+- PHASE 2 (open): write admin edits back to the Google Sheet (needs service
+  account WRITE scope: change spreadsheets.readonly -> spreadsheets, add a write
+  API route + Save buttons) so one admin can drive the shared TV live.

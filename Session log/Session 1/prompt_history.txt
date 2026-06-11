@@ -36,3 +36,7 @@ I want to host the auction data in a google sheet, where our staff will be takin
    "Here is our offline, Excel sheet with current data. Can you rebuild the data
    into a file I an import into Google Sheets with all the tabs and jazz"
 
+4. I want a way to test, reset and edit the auction dashboard values. Currently,
+   there are no controls, I want an admin button on the dashboard where I can
+   load into the backend/admin board
+
