@@ -10,6 +10,11 @@ interface Row {
   closing: boolean;
 }
 
+/**
+ * Every item and ticket, laid out in columns that fill TOP-DOWN and then
+ * LEFT-TO-RIGHT (CSS multi-column). Items come first, then each ticket group in
+ * closing order.
+ */
 export function BidList({
   items,
   groups,
@@ -47,31 +52,33 @@ export function BidList({
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
-      <h2 className="mb-2 text-xl font-extrabold uppercase tracking-[0.2em] text-slate-300">
+    <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
+      <h2 className="mb-2 shrink-0 text-xl font-extrabold uppercase tracking-[0.2em] text-slate-300">
         All Current High Bids
       </h2>
-      <div className="grid grid-cols-2 gap-x-8 gap-y-0.5 md:grid-cols-3 xl:grid-cols-4">
-        {rows.map((r) => (
-          <div
-            key={r.key}
-            className={`flex items-baseline justify-between border-b border-white/5 py-1 ${
-              r.closed ? "opacity-45" : ""
-            }`}
-          >
-            <span className="truncate pr-3 text-lg text-slate-100">{r.label}</span>
-            <span className="flex items-baseline gap-2 whitespace-nowrap">
-              <span className="text-lg font-bold tabular-nums">{formatMoney(r.bid)}</span>
-              <span
-                className={`text-xs uppercase tracking-wide ${
-                  r.closing ? "text-red-300" : "text-slate-400"
-                }`}
-              >
-                {r.secondary}
+      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
+        <div className="columns-1 gap-x-8 sm:columns-2 lg:columns-3 2xl:columns-4">
+          {rows.map((r) => (
+            <div
+              key={r.key}
+              className={`flex break-inside-avoid items-baseline justify-between border-b border-white/5 py-1 ${
+                r.closed ? "opacity-45" : ""
+              }`}
+            >
+              <span className="truncate pr-3 text-lg text-slate-100">{r.label}</span>
+              <span className="flex items-baseline gap-2 whitespace-nowrap">
+                <span className="text-lg font-bold tabular-nums">{formatMoney(r.bid)}</span>
+                <span
+                  className={`text-xs uppercase tracking-wide ${
+                    r.closing ? "text-red-300" : "text-slate-400"
+                  }`}
+                >
+                  {r.secondary}
+                </span>
               </span>
-            </span>
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

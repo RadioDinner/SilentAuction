@@ -1,13 +1,15 @@
 import type { AuctionState } from "@/lib/types";
-import { FeaturedItem } from "./FeaturedItem";
-import { TicketPanel } from "./TicketPanel";
-import { TicketGroupSummary } from "./TicketGroupSummary";
+import { SpotlightCard, type SpotEntry } from "./SpotlightCard";
 import { BidList } from "./BidList";
 import { formatClock, secsLeft } from "@/lib/format";
 
 /**
  * Pure presentation of an AuctionState at a given moment. Used by both the
  * live dashboard (/) and the admin test console's preview (/admin).
+ *
+ * Layout: two spotlight cards — "Now Closing" and "Next Up" — driven by a single
+ * timeline that merges items and tickets and sorts by soonest close. Below them,
+ * every item and ticket is listed in top-down, left-to-right columns.
  */
 export function DashboardView({
   state,
@@ -20,18 +22,45 @@ export function DashboardView({
 }) {
   const tz = state.config.timezone;
   const urgent = state.config.urgentThresholdSeconds;
-  const featured = state.items.find((i) => i.id === state.featuredItemId);
-  const groups = state.ticketGroups;
 
-  // Spotlight the group closing soonest; show the rest as compact cards.
-  const groupUrgency = (g: (typeof groups)[number]) => {
-    const open = g.tickets.filter((t) => t.status !== "closed");
-    if (open.length === 0) return Number.POSITIVE_INFINITY;
-    return Math.min(...open.map((t) => secsLeft(t.effectiveCloseISO, nowMs)));
-  };
-  const sortedGroups = [...groups].sort((a, b) => groupUrgency(a) - groupUrgency(b));
-  const spotlight = sortedGroups[0];
-  const otherGroups = sortedGroups.slice(1);
+  // Unified timeline of everything still open, soonest-closing first.
+  const open: SpotEntry[] = [];
+  for (const it of state.items) {
+    if (it.status === "closed") continue;
+    open.push({
+      key: `i-${it.id}`,
+      kind: "item",
+      name: it.name,
+      sub: it.description,
+      bid: it.currentBid,
+      bidder: it.highBidder,
+      closeISO: it.effectiveCloseISO,
+      secondsLeft: secsLeft(it.effectiveCloseISO, nowMs),
+      imageUrl: it.imageUrl,
+    });
+  }
+  for (const g of state.ticketGroups) {
+    for (const t of g.tickets) {
+      if (t.status === "closed") continue;
+      open.push({
+        key: `t-${t.id}`,
+        kind: "ticket",
+        name: g.group,
+        sub: `#${t.label}`,
+        bid: t.currentBid,
+        bidder: t.highBidder,
+        closeISO: t.effectiveCloseISO,
+        secondsLeft: secsLeft(t.effectiveCloseISO, nowMs),
+        imageUrl: t.imageUrl ?? g.imageUrl,
+      });
+    }
+  }
+  open.sort(
+    (a, b) =>
+      a.secondsLeft - b.secondsLeft ||
+      a.closeISO.localeCompare(b.closeISO) ||
+      a.name.localeCompare(b.name),
+  );
 
   return (
     <main className="flex h-full flex-col gap-4 p-4">
@@ -65,32 +94,12 @@ export function DashboardView({
         </div>
       )}
 
-      <div
-        className={`grid min-h-0 flex-1 gap-4 ${
-          groups.length > 0 ? "grid-cols-[1.6fr_1fr]" : "grid-cols-1"
-        }`}
-      >
-        <FeaturedItem item={featured} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
-        {spotlight && (
-          <div className="flex min-h-0 flex-col gap-3">
-            <TicketPanel group={spotlight} nowMs={nowMs} urgentSeconds={urgent} />
-            {otherGroups.length > 0 && (
-              <div className="grid shrink-0 grid-cols-2 gap-3">
-                {otherGroups.map((g) => (
-                  <TicketGroupSummary
-                    key={g.group}
-                    group={g}
-                    nowMs={nowMs}
-                    urgentSeconds={urgent}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <SpotlightCard variant="now" entry={open[0]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
+        <SpotlightCard variant="next" entry={open[1]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
       </div>
 
-      <BidList items={state.items} groups={groups} tz={tz} />
+      <BidList items={state.items} groups={state.ticketGroups} tz={tz} />
     </main>
   );
 }
