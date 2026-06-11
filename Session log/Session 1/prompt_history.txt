@@ -1,0 +1,24 @@
+1. I want to start a new project. Here are the new session instructions.
+
+The goals of this project are as follows.
+
+* Build a single screen, live updating dashboard to display on a screen at our company picnic, to display information of a silent auction.
+* A separate tab or backend interface that updates from a google sheet
+* A dashboard that is dynamic and can display a picture and a timer and a current bid
+
+An example of what I want to see on the dashboard. At 530pm, the first item, Item #1 closes, UNLESS a bid is placed. So lets say it is 5:24pm. The bid for Item #1 is $1500. Someone walks up at 5:30pm and tells one of our staff, I bidd $1600. I want the staff member to enter the bid, from the backend/admin dashboard, and the display will change the end time of the auction for that item to 5:31pm, High bid $1600.
+
+I want the dashboard to be able to display a smaller section, with a list of all the current high bids on all the items.
+
+A few uniques. We have some items that are tickets, like 12 of the same thing. However, they don't all dynamically bid up. Right now, the bids range from $20 to $50. I want the Highest ticket to end first. Right now, the highest ticket is 10 of 12. That is at $50. Let's say that one closes/ends at 6pm. If someone outbids that, at $60. The ending of ALL tickets get extended by 1 minute. Then the next lowest high bid starts ending, that is ticket #1 at $40. Then when someone bids that to $50, ALL the remaining un-ended tickets go up by one.
+
+I want to host the auction data in a google sheet, where our staff will be taking bids and I want to host the dashboard on a vercel deployed project.
+
+[NEW SESSION INSTRUCTIONS block included with this prompt — session log folder workflow, prompt history logging verbatim, session handoff log, reading previous logs, git workflow (merge/push to main unless told to branch), Supabase migration numbering counting down from 999, and general guidance.]
+
+---
+[Clarifying-question answers selected by the user via the dashboard prompt UI — not free-text, but recorded here as they are user decisions that shaped the build:]
+  Q1 (Bid entry): "Edit Google Sheet directly"
+  Q2 (Ticket order): "Highest closes first"
+  Q3 (Ticket timing): "Auto, fixed length"
+

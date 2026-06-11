@@ -1,0 +1,32 @@
+{
+  "name": "silent-auction-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live-updating silent auction dashboard (Next.js + Google Sheets) for the company picnic.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "googleapis": "173.0.0",
+    "luxon": "3.7.2",
+    "next": "15.5.19",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.4.2",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "10.5.0",
+    "postcss": "8.5.15",
+    "tailwindcss": "3.4.19",
+    "typescript": "^5.7.2",
+    "vitest": "4.1.8"
+  }
+}

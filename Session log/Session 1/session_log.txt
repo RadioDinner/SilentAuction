@@ -1,0 +1,145 @@
+SESSION 1 — HANDOFF LOG
+=======================
+Date: 2026-06-11
+Branch: claude/adoring-planck-ltbhfw
+Project: Silent Auction Dashboard (company picnic)
+
+
+a. WHAT WAS BUILT / FILES CREATED
+---------------------------------
+Greenfield project. The repo was empty (no commits) at the start of this
+session. Built a complete, working Next.js 15 app deployable to Vercel, reading
+from a Google Sheet, with a live-updating single-screen dashboard.
+
+Build/config:
+  package.json, package-lock.json   Next 15.5.19, React 18.3.1, Tailwind 3.4,
+                                    googleapis 173, luxon 3.7, vitest 4.1
+  tsconfig.json, next.config.mjs
+  tailwind.config.ts, postcss.config.mjs, app/globals.css
+  vitest.config.ts
+  .gitignore, .env.example
+
+Core logic (pure, framework-free, unit-tested):
+  lib/types.ts        Shared input + computed types
+  lib/auction.ts      THE ENGINE: anti-snipe + ticket cascade, stateless,
+                      pure function of (sheet data + now)
+  lib/auction.test.ts 18 tests, all passing — encode the exact scenarios from
+                      the brief ($1500->$1600 item; highest-ticket-first cascade;
+                      "extend all remaining tickets by 1 min")
+  lib/config.ts       Parses the Config tab (key/value) -> AuctionConfig
+  lib/time.ts         Timezone-aware parsing of loose sheet times (luxon)
+  lib/sheets.ts       Google Sheets reader (service account, read-only),
+                      forgiving header matching
+  lib/demo.ts         Built-in demo dataset (always-live, relative to now)
+  lib/format.ts       Money / countdown / clock formatting (client-safe)
+
+API:
+  app/api/state/route.ts   Reads sheet (or demo), computes AuctionState, returns
+                           JSON with no-store. Falls back to demo on any error.
+
+UI (dashboard):
+  app/layout.tsx, app/page.tsx (client; polls /api/state, server-clock-synced
+                                countdowns, 500ms local ticker, 3s poll)
+  components/FeaturedItem.tsx  Hero: image, big countdown, high bid + bidder
+  components/TicketPanel.tsx   Ticket group: "Now Closing" + full ticket list
+  components/BidList.tsx       "All current high bids" grid (items + tickets)
+  components/Countdown.tsx     Reusable countdown w/ urgent (red, pulsing) state
+
+Docs / ops:
+  README.md                 Full setup + deploy + day-of guide
+  docs/SHEET_TEMPLATE.md    Exact sheet schema (Items / Tickets / Config tabs)
+  google-apps-script/onEditTimestamp.gs  onEdit script that auto-stamps
+                            "Last Bid Time" when "Current Bid" changes
+
+Session log:
+  Session log/Session 1/prompt_history.txt
+  Session log/Session 1/session_log.txt (this file)
+
+
+b. DIRECTIONAL DECISIONS
+------------------------
+Confirmed with the user via clarifying questions:
+  1. BID ENTRY: staff edit the Google Sheet directly (the sheet IS the admin
+     interface). No custom admin page, no DB. Dashboard reads the sheet.
+  2. TICKETS: highest bid closes first (descending), one active countdown at a
+     time, a bid on the active ticket extends ALL remaining tickets by 1 min.
+  3. TICKET TIMING: next ticket's countdown auto-starts when the previous
+     closes; fixed configurable length (ticket_countdown_seconds).
+
+Architecture decisions:
+  - Stack: Next.js (App Router) on Vercel. Google Sheets API via service
+    account (read-only). Polling (default 3s) instead of websockets — simpler,
+    robust for a one-day event.
+  - All auction rules live SERVER-SIDE in lib/auction.ts as a PURE, STATELESS
+    function of (sheet data + current time). No stored cascade state, so any
+    reload yields the correct picture. This is the key design choice.
+  - Anti-snipe (regular items): effectiveClose = max(scheduledClose,
+    lastBidTime + window). Default window 60s. Matches the 5:30->5:31 example.
+  - Ticket cascade: tickets sorted by bid desc; close[i] = (i==0 ? cascadeStart
+    : close[i-1] + countdown), then anti-snipe max() per ticket. Because later
+    closes derive from earlier ones, extending the active ticket shifts all
+    remaining tickets by the same amount automatically.
+  - Bid timing source: Apps Script auto-stamps "Last Bid Time" on bid edits, so
+    staff only type the amount. Manual entry also supported.
+  - SUPABASE NOTE: the New Session Instructions mention Supabase migration
+    numbering, but this project uses Google Sheets per the user's explicit
+    choice. No Supabase/DB is used. supabase/migrations/ does NOT exist. If a DB
+    is ever introduced, revisit.
+
+Verification done this session:
+  - npm test -> 18/18 pass.
+  - npm run build -> clean (page static, /api/state dynamic).
+  - Ran the prod server, curled /api/state (demo): featured = soonest-closing
+    item; ticket cascade correct (highest $50 ticket active first, descending,
+    spaced by countdown).
+  - Captured a 1920x1080 headless screenshot (puppeteer, --no-save) — layout
+    renders correctly. (Featured image was blank only because the sandbox
+    blocks external image hosts; real public image URLs will show.)
+
+
+c. UNRESOLVED / OPEN ITEMS
+--------------------------
+  - GIT TARGET: User's standing instruction says "merge and push to main unless
+    told to create a branch." The harness assigned branch
+    claude/adoring-planck-ltbhfw and says never push elsewhere without explicit
+    permission. Since a branch WAS specified, this session committed/pushed to
+    claude/adoring-planck-ltbhfw (no main branch exists yet). If the user wants
+    it on main, merge the branch or open a PR (user has not asked for a PR).
+  - The user must still: create the Google Sheet, create a GCP service account,
+    set the 3 GOOGLE_* env vars (locally + in Vercel), and deploy. README walks
+    through all of it. Until then the dashboard shows demo data.
+  - Multiple ticket GROUPS share one ticket_cascade_start in Config. Fine for
+    the described single group of 12. Per-group start times are a future
+    enhancement if needed.
+  - Edge case (documented, low risk): if a NON-active ticket is bid above the
+    active one, the cascade re-sorts. The day-of flow (bids go to the active
+    ticket) avoids this; acceptable for the event.
+  - No image-domain handling needed: featured/ticket images use plain <img>, so
+    any public URL works (no next.config remotePatterns required).
+
+
+d. KEY CONTEXT FOR NEXT SESSION
+-------------------------------
+  - The auction rules are ALL in lib/auction.ts and fully tested in
+    lib/auction.test.ts. Change rules there; keep it pure (no IO). Run
+    `npm test` after any change.
+  - Demo mode: AUCTION_DEMO=1 env, or visit /?demo=1, or simply leave the
+    GOOGLE_* vars unset. Demo data is in lib/demo.ts (regenerated each request
+    relative to now, so it's always counting down).
+  - Sheet header matching is forgiving (lib/sheets.ts pick()/norm()). Canonical
+    headers are in docs/SHEET_TEMPLATE.md.
+  - Time parsing (lib/time.ts) anchors clock-only times ("5:30 PM") to
+    Config.event_date in Config.timezone; full ISO and common datetime formats
+    also accepted.
+  - Countdowns are synced to the server clock (serverNowISO offset) so the TV's
+    own clock being wrong doesn't matter.
+  - To preview locally: `npm install` then `npm run dev` -> http://localhost:3000.
+
+
+e. CURRENT STATE
+----------------
+  - App is COMPLETE and verified (tests + build + runtime + screenshot).
+  - Committed and pushed to origin/claude/adoring-planck-ltbhfw.
+  - Not yet connected to a real Google Sheet (awaiting user's sheet + creds).
+  - Not deployed to Vercel yet (awaiting user).
+  - No PR opened (not requested).
