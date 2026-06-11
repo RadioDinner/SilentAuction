@@ -183,3 +183,114 @@ export async function getAuctionDataFromSheet(): Promise<AuctionData> {
 
   return { config, items, tickets };
 }
+
+export interface SheetDiagnostics {
+  hasCredentials: boolean;
+  ok: boolean;
+  error?: string;
+  sheetIdMasked?: string;
+  serviceAccountEmail?: string;
+  spreadsheetTitle?: string;
+  /** Actual tab names found in the spreadsheet. */
+  tabsFound?: string[];
+  /** Tab names the app looks for. */
+  tabsExpected: { items: string; tickets: string; config: string };
+  counts?: {
+    itemRows: number;
+    ticketRows: number;
+    configRows: number;
+    parsedItems: number;
+    parsedTickets: number;
+  };
+  hint?: string;
+}
+
+/**
+ * Self-diagnosis for the Google Sheet connection. Surfaced at /api/diag so the
+ * deployed app can report exactly why data isn't loading without anyone needing
+ * to read the sheet directly.
+ */
+export async function getDiagnostics(): Promise<SheetDiagnostics> {
+  const tabsExpected = { items: ITEMS_TAB, tickets: TICKETS_TAB, config: CONFIG_TAB };
+
+  if (!hasSheetCredentials()) {
+    const missing = [
+      !process.env.GOOGLE_SHEET_ID && "GOOGLE_SHEET_ID",
+      !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+      !process.env.GOOGLE_PRIVATE_KEY && "GOOGLE_PRIVATE_KEY",
+    ].filter(Boolean);
+    return {
+      hasCredentials: false,
+      ok: false,
+      tabsExpected,
+      error: `Missing env var(s): ${missing.join(", ")}`,
+      hint: "Set these in Vercel → Project → Settings → Environment Variables, then redeploy.",
+    };
+  }
+
+  const sheetId = process.env.GOOGLE_SHEET_ID!;
+  const sheetIdMasked =
+    sheetId.length > 10 ? `${sheetId.slice(0, 5)}…${sheetId.slice(-4)}` : sheetId;
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+
+  try {
+    const client = sheetsClient();
+    const meta = await client.spreadsheets.get({ spreadsheetId: sheetId });
+    const tabsFound = (meta.data.sheets ?? [])
+      .map((s) => s.properties?.title ?? "")
+      .filter(Boolean);
+
+    const [itemRows, ticketRows, configRows] = await Promise.all([
+      readTab(client, sheetId, ITEMS_TAB),
+      readTab(client, sheetId, TICKETS_TAB),
+      readTab(client, sheetId, CONFIG_TAB),
+    ]);
+    const config = parseConfig(parseConfigRows(configRows));
+    const items = parseItems(itemRows, config.eventDateISO, config.timezone);
+    const tickets = parseTickets(ticketRows, config.eventDateISO, config.timezone);
+
+    let hint: string | undefined;
+    if (!tabsFound.includes(ITEMS_TAB)) {
+      hint = `No tab named "${ITEMS_TAB}" was found. Your tabs are: ${tabsFound.join(", ")}. Rename your items tab to exactly "${ITEMS_TAB}".`;
+    } else if (items.length === 0) {
+      hint = `The "${ITEMS_TAB}" tab has no data rows the app could read. Make sure the header row is row 1 (ID, Name, …) and items start on row 2.`;
+    }
+
+    return {
+      hasCredentials: true,
+      ok: true,
+      sheetIdMasked,
+      serviceAccountEmail,
+      spreadsheetTitle: meta.data.properties?.title ?? undefined,
+      tabsFound,
+      tabsExpected,
+      counts: {
+        itemRows: itemRows.length,
+        ticketRows: ticketRows.length,
+        configRows: configRows.length,
+        parsedItems: items.length,
+        parsedTickets: tickets.length,
+      },
+      hint,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    let hint: string | undefined;
+    if (/not found|Requested entity/i.test(message)) {
+      hint = "The GOOGLE_SHEET_ID looks wrong — no spreadsheet with that ID. Copy the part between /d/ and /edit in the sheet URL.";
+    } else if (/permission|forbidden|403/i.test(message)) {
+      hint = `The sheet isn't shared with the service account. Share it (Viewer) with ${serviceAccountEmail}.`;
+    } else if (/invalid_grant|DECODER|PEM|private key|invalid.*key/i.test(message)) {
+      hint = "GOOGLE_PRIVATE_KEY looks malformed. Paste the whole key including the BEGIN/END lines; keep the \\n sequences.";
+    }
+    return {
+      hasCredentials: true,
+      ok: false,
+      sheetIdMasked,
+      serviceAccountEmail,
+      tabsExpected,
+      error: message,
+      hint,
+    };
+  }
+}
