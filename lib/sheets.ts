@@ -7,10 +7,19 @@ import type { AuctionData, RegularItem, TicketItem } from "./types";
 import { norm, parseConfig } from "./config";
 import { parseSheetTime } from "./time";
 import { normalizePrivateKey } from "./private-key";
+import {
+  planConfigWrites,
+  planItemWrites,
+  planTicketWrites,
+  type ConfigWrite,
+  type ItemWrite,
+  type Row as WriteRow,
+  type TicketWrite,
+} from "./sheet-write";
 
-const ITEMS_TAB = process.env.SHEET_ITEMS_TAB || "Items";
-const TICKETS_TAB = process.env.SHEET_TICKETS_TAB || "Tickets";
-const CONFIG_TAB = process.env.SHEET_CONFIG_TAB || "Config";
+export const ITEMS_TAB = process.env.SHEET_ITEMS_TAB || "Items";
+export const TICKETS_TAB = process.env.SHEET_TICKETS_TAB || "Tickets";
+export const CONFIG_TAB = process.env.SHEET_CONFIG_TAB || "Config";
 
 type Row = (string | number | boolean | null)[];
 
@@ -23,11 +32,15 @@ export function hasSheetCredentials(): boolean {
   );
 }
 
-function sheetsClient() {
+function sheetsClient(scope: "read" | "write" = "read") {
   const auth = new google.auth.JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    scopes: [
+      scope === "write"
+        ? "https://www.googleapis.com/auth/spreadsheets"
+        : "https://www.googleapis.com/auth/spreadsheets.readonly",
+    ],
   });
   return google.sheets({ version: "v4", auth });
 }
@@ -295,4 +308,83 @@ export async function getDiagnostics(): Promise<SheetDiagnostics> {
       hint,
     };
   }
+}
+
+export interface AuctionWritePayload {
+  items: ItemWrite[];
+  tickets: TicketWrite[];
+  config: ConfigWrite;
+}
+
+export interface AuctionWriteResult {
+  ok: boolean;
+  /** Total cells written. */
+  updatedCells: number;
+  itemUpdates: number;
+  ticketUpdates: number;
+  settingUpdates: number;
+  /** Payload rows that didn't match anything in the sheet. */
+  unmatched: string[];
+  /** Managed fields/keys with no column or row to write to. */
+  skipped: string[];
+}
+
+/**
+ * Write the admin's bid / time / settings edits back to the Google Sheet.
+ * Reads the current tabs, plans the minimal set of cell changes (pure, in
+ * sheet-write.ts), then applies them with one batchUpdate. RAW input keeps our
+ * formatted time strings from being re-coerced by Sheets, so they round-trip.
+ */
+export async function applyAuctionWrites(
+  payload: AuctionWritePayload,
+): Promise<AuctionWriteResult> {
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID!;
+  const client = sheetsClient("write");
+
+  const [itemRows, ticketRows, configRows] = await Promise.all([
+    readTab(client, spreadsheetId, ITEMS_TAB),
+    readTab(client, spreadsheetId, TICKETS_TAB),
+    readTab(client, spreadsheetId, CONFIG_TAB),
+  ]);
+
+  // Config drives timezone / event date used to format and compare times.
+  const config = parseConfig(parseConfigRows(configRows));
+
+  const itemPlan = planItemWrites(
+    itemRows as WriteRow[],
+    payload.items,
+    ITEMS_TAB,
+    config.eventDateISO,
+    config.timezone,
+  );
+  const ticketPlan = planTicketWrites(
+    ticketRows as WriteRow[],
+    payload.tickets,
+    TICKETS_TAB,
+    config.eventDateISO,
+    config.timezone,
+  );
+  const configPlan = planConfigWrites(configRows as WriteRow[], payload.config, CONFIG_TAB);
+
+  const updates = [...itemPlan.updates, ...ticketPlan.updates, ...configPlan.updates];
+
+  if (updates.length > 0) {
+    await client.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: "RAW",
+        data: updates.map((u) => ({ range: u.range, values: u.values })),
+      },
+    });
+  }
+
+  return {
+    ok: true,
+    updatedCells: updates.length,
+    itemUpdates: itemPlan.updates.length,
+    ticketUpdates: ticketPlan.updates.length,
+    settingUpdates: configPlan.updates.length,
+    unmatched: [...itemPlan.unmatched, ...ticketPlan.unmatched],
+    skipped: [...itemPlan.skipped, ...ticketPlan.skipped, ...configPlan.skipped],
+  };
 }

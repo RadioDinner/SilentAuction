@@ -1,0 +1,113 @@
+SESSION 2 — HANDOFF LOG
+=======================
+Date: 2026-06-11
+Branch: claude/great-shannon-qz1snq
+Project: Silent Auction Dashboard (company picnic)
+
+
+a. WHERE THIS SESSION PICKED UP
+-------------------------------
+The user said their previous session "got stuck" and asked to continue. No live
+conversation carried over, so state was reconstructed from:
+  - Session log/Session 1/{prompt_history,session_log}.txt
+  - git history + working tree (clean, all prior work committed)
+
+Reconstruction: Session 1 built the whole app and ended mid "connect the real
+Google Sheet" phase — the final two commits (/api/diag, tolerant
+GOOGLE_PRIVATE_KEY parsing) were diagnostics for that and weren't even in the S1
+log. The one clearly-unfinished ENGINEERING item was the documented "Phase 2":
+write admin edits back to the sheet so one person can drive the live TV.
+
+Verified healthy baseline first: npm install, 25/25 tests pass, tree clean.
+
+User was asked which thread to resume (debug live Sheet / build Phase 2 /
+finalize+deploy) and answered "No preference." The live-debug and deploy threads
+are both BLOCKED on info only the user has (their /api/diag output; exact close
+times + timezone). Phase 2 is fully actionable solo and delivers the live-control
+goal, so that was built.
+
+
+b. WHAT WAS BUILT THIS SESSION — Phase 2: Save to Sheet (write-back)
+-------------------------------------------------------------------
+The /admin console can now push edits BACK to the Google Sheet (previously
+read-only + browser-local). The live dashboards pick changes up on their next
+poll (~3s).
+
+New / changed files:
+  lib/sheet-write.ts        PURE planning of write-backs (no IO). Locates columns
+                            by header NAME (same forgiving aliases as the reader)
+                            and rows by identity (item id; ticket group+label),
+                            and emits a cell update ONLY when the value actually
+                            changed (idempotent; never clobbers descriptive cols).
+                            Exports planItemWrites / planTicketWrites /
+                            planConfigWrites / colLetter.
+  lib/sheet-write.test.ts   11 unit tests (matching, idempotency, time round-trip,
+                            unmatched + missing-column reporting, group+label
+                            match, config update/skip).
+  lib/time.ts               + formatSheetTime(iso, tz) -> "M/d/yyyy h:mm:ss a",
+                            a value that round-trips back through parseSheetTime.
+  lib/sheets.ts             Exported ITEMS/TICKETS/CONFIG_TAB. sheetsClient() now
+                            takes "read"|"write" scope (write = spreadsheets).
+                            + applyAuctionWrites(payload): reads tabs, runs the
+                            pure planners, applies ONE values.batchUpdate with
+                            valueInputOption:"RAW" (so our formatted times aren't
+                            re-coerced), returns counts + unmatched + skipped.
+  app/api/admin/save/route.ts  POST endpoint. Guards: 503 if ADMIN_TOKEN unset
+                            (read-only by default), 401 on bad token
+                            (length-independent compare), 400 in demo / no creds.
+                            Maps Google permission/key errors to friendly hints.
+  app/admin/page.tsx        New green "Save to Sheet" panel: token field (saved to
+                            localStorage), Save button (disabled in demo), a
+                            confirm() gate, and a result line (counts / warnings).
+                            Tracks live source (sheet|demo). Reworded the banner.
+  .env.example, README.md   Documented ADMIN_TOKEN + the EDITOR-access requirement
+                            and the day-of "Reload from source -> edit -> Save"
+                            flow. Updated config table + project layout.
+
+
+c. DESIGN DECISIONS / RATIONALE
+-------------------------------
+  - SAFETY BY DEFAULT: writes are OFF unless ADMIN_TOKEN is set AND the service
+    account has Editor. Read-only deploys are unaffected (read path still uses the
+    .readonly scope; only the write route requests the broader scope).
+  - MINIMAL, TARGETED WRITES: only the live-changing fields are managed
+    (item: currentBid/highBidder/lastBidTime/closeTime; ticket: same +
+    cascadeStart; config: eventName + the *seconds* timing keys + featuredItemId).
+    Name/description/image/winner-phone/paid columns are never touched.
+  - ROW MATCHING: items by ID (falls back to name, mirroring the reader); tickets
+    by group+label. A payload row not found is REPORTED (unmatched), never
+    appended — avoids duplicate rows on a live sheet. Same for missing columns
+    (skipped) and missing config keys (skipped, not appended).
+  - TIME ROUND-TRIP: write human-readable local times ("7/18/2026 5:31:00 PM")
+    with RAW input so Sheets stores them as text and parseSheetTime reads them
+    back to the identical instant. Verified by a test.
+  - FOOTGUN GUARD: the console can simulate bids + fast-forward; those values are
+    what gets saved. Mitigations: explicit confirm() dialog, a clear panel note,
+    and the documented "Reload from source first" flow.
+
+Verification this session:
+  - npm test -> 36/36 pass (was 25; +11 in sheet-write.test.ts).
+  - npm run build -> clean; /api/admin/save shows as a dynamic route.
+  - Ran prod server, curled the endpoint: 503 (no token), 401 (bad token),
+    400 (right token but demo mode). The actual Sheets batchUpdate path needs
+    real creds to exercise end-to-end (planner logic is unit-tested).
+
+
+d. CURRENT STATE
+----------------
+  - App COMPLETE incl. Phase 2 write-back. Tests + build green.
+  - Committed and pushed to origin/claude/great-shannon-qz1snq.
+  - No PR opened (not requested).
+
+
+e. STILL OPEN / FOR THE USER
+----------------------------
+  - LIVE-SHEET END-TO-END: still untested against a real sheet (needs the user's
+    creds + Editor access + ADMIN_TOKEN). To enable: set ADMIN_TOKEN, grant the
+    service account Editor, redeploy, open /admin, enter the token, Save.
+  - The user's ORIGINAL blocked threads remain: (1) confirm why their live sheet
+    wasn't showing data — get /api/diag output; (2) provide exact item close
+    times + ticket cascade starts; confirm timezone (guessed America/New_York)
+    and event_date (guessed 2026-07-18); then deploy on Vercel (docs/SETUP_GUIDE.md).
+  - Possible future: append NEW items/tickets/config keys from the console (today
+    they're reported, not created); per-item "featured" write via the Items tab.

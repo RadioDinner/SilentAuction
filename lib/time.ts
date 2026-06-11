@@ -73,6 +73,19 @@ export function parseSheetTime(
   return undefined;
 }
 
+/**
+ * Format an ISO instant as a sheet-friendly local datetime string in `tz`.
+ * The output ("M/d/yyyy h:mm:ss a") is one of the DATETIME_FORMATS above, so a
+ * value written by this function round-trips cleanly back through
+ * parseSheetTime. Returns "" for a missing/invalid input.
+ */
+export function formatSheetTime(iso: string | undefined | null, tz: string): string {
+  if (!iso) return "";
+  const dt = DateTime.fromISO(iso, { setZone: true }).setZone(tz);
+  if (!dt.isValid) return "";
+  return dt.toFormat("M/d/yyyy h:mm:ss a");
+}
+
 /** Parse a date like "2026-06-11" or "6/11/2026" to an ISO date string. */
 export function parseEventDate(
   raw: unknown,

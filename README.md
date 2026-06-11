@@ -98,9 +98,26 @@ open a built-in test console. It loads the current auction and lets you:
 - **Reset** back to the source data at any time.
 
 A live preview of the real dashboard sits on the right, driven by the same
-auction engine. **Changes in the console stay in your browser** — they don't
-touch the live dashboard on other screens or your Google Sheet. (Writing edits
-back to the sheet for live, shared control is a planned follow-up.)
+auction engine. **Edits and the test clock stay in your browser** — they don't
+touch the live dashboard on other screens or your Google Sheet, *until you press
+Save to Sheet* (below).
+
+### Save to Sheet (live, shared control)
+
+To let one person drive the TVs from the console, set an **`ADMIN_TOKEN`**
+environment variable (any long random string) and grant the service account
+**Editor** access to the sheet. Then the green **Save to Sheet** panel in the
+console becomes active: enter the token once and click **Save**. It writes the
+current bids, bidders, bid/close times, cascade starts and timing settings back
+to the sheet, and every dashboard picks the change up on its next poll
+(~3 seconds).
+
+- It writes only the cells that actually changed, matching rows by item **ID**
+  (or **Group + Ticket label**), so it never clobbers your descriptive columns.
+- Day-of flow: click **Reload from source** to start from the live sheet, type
+  the new bid, then **Save**.
+- Leave `ADMIN_TOKEN` unset to keep the app fully read-only — the Save button is
+  disabled and the write API returns `503`.
 
 ## Connect your Google Sheet
 
@@ -181,6 +198,7 @@ correct even if the TV's clock is off.
 | Event name, timezone, dates, windows, ticket timing, featured item | `Config` tab | see template |
 | Poll interval (seconds) | `NEXT_PUBLIC_POLL_SECONDS` env | `3` |
 | Force demo data | `AUCTION_DEMO=1` env, or `?demo=1` on the URL | off |
+| Live "Save to Sheet" | `ADMIN_TOKEN` env + service-account Editor access | off (read-only) |
 | Tab names | `SHEET_ITEMS_TAB` / `SHEET_TICKETS_TAB` / `SHEET_CONFIG_TAB` env | `Items` / `Tickets` / `Config` |
 
 ---
@@ -189,19 +207,23 @@ correct even if the TV's clock is off.
 
 ```
 app/
-  page.tsx            Dashboard (client): polls /api/state, renders, ticks countdowns
-  admin/page.tsx      Admin / test console (browser-local edits + live preview)
-  api/state/route.ts  Reads the sheet (or demo) and returns computed AuctionState
-components/           DashboardView, FeaturedItem, TicketPanel, TicketGroupSummary, BidList, Countdown
+  page.tsx               Dashboard (client): polls /api/state, renders, ticks countdowns
+  admin/page.tsx         Admin / test console (browser edits, live preview, Save to Sheet)
+  api/state/route.ts     Reads the sheet (or demo) and returns computed AuctionState
+  api/diag/route.ts      Sheet-connection self-diagnosis
+  api/admin/save/route.ts  Token-protected write-back of admin edits to the sheet
+components/              DashboardView, FeaturedItem, TicketPanel, TicketGroupSummary, BidList, Countdown
 lib/
-  auction.ts          Pure auction engine (anti-snipe + ticket cascade)
-  auction.test.ts     Unit tests for the rules above
-  sheets.ts           Google Sheets reader
-  config.ts           Config-tab parsing
-  time.ts             Timezone-aware time parsing
-  demo.ts             Built-in demo dataset
-  format.ts           Money / countdown / clock formatting
-google-apps-script/   onEdit timestamp script for the sheet
+  auction.ts            Pure auction engine (anti-snipe + ticket cascade)
+  auction.test.ts       Unit tests for the rules above
+  sheets.ts             Google Sheets reader + write-back IO
+  sheet-write.ts        Pure planning of which cells to write back
+  sheet-write.test.ts   Unit tests for the write planner
+  config.ts             Config-tab parsing
+  time.ts               Timezone-aware time parsing / formatting
+  demo.ts               Built-in demo dataset
+  format.ts             Money / countdown / clock formatting
+google-apps-script/     onEdit timestamp script for the sheet
 docs/SHEET_TEMPLATE.md
 ```
 

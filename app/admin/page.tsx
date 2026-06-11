@@ -6,6 +6,7 @@ import { DashboardView } from "@/components/DashboardView";
 import type { AuctionData, AuctionState } from "@/lib/types";
 
 const STORAGE_KEY = "auction-admin-data-v1";
+const TOKEN_KEY = "auction-admin-token";
 
 const input =
   "w-full rounded bg-white/10 px-2 py-1 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-sky-400";
@@ -64,6 +65,16 @@ export default function AdminConsole() {
   const [shiftMs, setShiftMs] = useState(0); // clock fast-forward
   const offsetRef = useRef(0); // serverNow - clientNow
   const srcRef = useRef<"sheet" | "demo">("demo");
+  const [source, setSource] = useState<"sheet" | "demo">("demo");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Load the saved admin token (kept in this browser only).
+  useEffect(() => {
+    const t = typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
+    if (t) setToken(t);
+  }, []);
 
   // Load: prefer saved local edits, fall back to /api/state.
   useEffect(() => {
@@ -73,6 +84,7 @@ export default function AdminConsole() {
       .then((s: AuctionState) => {
         offsetRef.current = Date.parse(s.serverNowISO) - Date.now();
         srcRef.current = s.source;
+        setSource(s.source);
         if (saved) {
           try {
             setData(JSON.parse(saved));
@@ -119,8 +131,81 @@ export default function AdminConsole() {
       .then((s: AuctionState) => {
         offsetRef.current = Date.parse(s.serverNowISO) - Date.now();
         srcRef.current = s.source;
+        setSource(s.source);
         setData(stateToData(s));
       });
+  }
+
+  function buildWritePayload(d: AuctionData) {
+    return {
+      items: d.items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        currentBid: i.currentBid ?? null,
+        highBidder: i.highBidder ?? null,
+        lastBidISO: i.lastBidISO ?? null,
+        baseCloseISO: i.baseCloseISO ?? null,
+      })),
+      tickets: d.tickets.map((t) => ({
+        group: t.group,
+        label: t.label,
+        currentBid: t.currentBid ?? null,
+        highBidder: t.highBidder ?? null,
+        lastBidISO: t.lastBidISO ?? null,
+        cascadeStartISO: t.cascadeStartISO ?? null,
+      })),
+      config: {
+        eventName: d.config.eventName,
+        extensionWindowSeconds: d.config.extensionWindowSeconds,
+        ticketCountdownSeconds: d.config.ticketCountdownSeconds,
+        urgentThresholdSeconds: d.config.urgentThresholdSeconds,
+        featuredItemId: d.config.featuredItemId ?? "",
+      },
+    };
+  }
+
+  async function saveToSheet() {
+    if (!data) return;
+    if (!token.trim()) {
+      setSaveMsg({ ok: false, text: "Enter the admin token first." });
+      return;
+    }
+    if (
+      !window.confirm(
+        "Save these values to the LIVE Google Sheet? This updates what everyone sees on the TV.",
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch("/api/admin/save", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-admin-token": token.trim() },
+        body: JSON.stringify(buildWritePayload(data)),
+      });
+      const r = await res.json();
+      if (!res.ok || !r.ok) {
+        setSaveMsg({ ok: false, text: `${r.error ?? res.statusText}${r.hint ? " — " + r.hint : ""}` });
+      } else {
+        const notes: string[] = [];
+        if (r.unmatched?.length) notes.push(`${r.unmatched.length} row(s) not found`);
+        if (r.skipped?.length) notes.push(r.skipped.join("; "));
+        const tail = notes.length ? ` (${notes.join(" · ")})` : "";
+        setSaveMsg({
+          ok: true,
+          text:
+            r.updatedCells === 0
+              ? `Nothing to update — the sheet already matches.${tail}`
+              : `Saved ${r.updatedCells} cell(s): ${r.itemUpdates} item, ${r.ticketUpdates} ticket, ${r.settingUpdates} setting. The live dashboard updates within a few seconds.${tail}`,
+        });
+      }
+    } catch (e) {
+      setSaveMsg({ ok: false, text: String(e) });
+    } finally {
+      setSaving(false);
+    }
   }
 
   function updateItem(idx: number, patch: Partial<AuctionData["items"][number]>) {
@@ -202,9 +287,58 @@ export default function AdminConsole() {
         </div>
 
         <p className="mb-4 rounded-lg bg-sky-500/10 px-3 py-2 text-sm text-sky-200">
-          Changes here stay in <b>your browser only</b> — they don&apos;t touch the live dashboard or
-          your Google Sheet. Use the clock to fast-forward and watch items close and cascades roll.
+          Edits and the test clock stay in <b>your browser only</b> — until you press{" "}
+          <b>Save to Sheet</b> below. Fast-forward the clock to watch items close and cascades roll
+          without touching anything live.
         </p>
+
+        {/* Live save */}
+        <section className="mb-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-bold uppercase tracking-wider text-emerald-200">
+              Live · Save to Google Sheet
+            </span>
+            <span className="text-xs text-emerald-200/80">
+              source: {source === "sheet" ? "Google Sheet" : "demo data"}
+            </span>
+          </div>
+          <p className="mb-2 text-xs text-emerald-100/80">
+            Pushes the current bids, bidders, times and settings to the sheet. The TV reads the sheet,
+            so it updates within a few seconds. Tip: click <b>Reload from source</b> first to start
+            from the live sheet, change the bid, then save.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="password"
+              className={`${input} w-48`}
+              placeholder="admin token"
+              value={token}
+              onChange={(e) => {
+                setToken(e.target.value);
+                window.localStorage.setItem(TOKEN_KEY, e.target.value);
+              }}
+            />
+            <button
+              className="rounded bg-emerald-500/80 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-40"
+              onClick={saveToSheet}
+              disabled={saving || source !== "sheet"}
+              title={source !== "sheet" ? "No live sheet connected (demo mode)" : "Save to the Google Sheet"}
+            >
+              {saving ? "Saving…" : "⤴ Save to Sheet"}
+            </button>
+            {source !== "sheet" && (
+              <span className="text-xs text-emerald-200/70">Connect a sheet to enable live saving.</span>
+            )}
+          </div>
+          {saveMsg && (
+            <p
+              className={`mt-2 text-xs ${saveMsg.ok ? "text-emerald-200" : "text-red-300"}`}
+            >
+              {saveMsg.ok ? "✅ " : "❌ "}
+              {saveMsg.text}
+            </p>
+          )}
+        </section>
 
         {/* Clock */}
         <section className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
