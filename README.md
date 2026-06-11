@@ -84,7 +84,29 @@ npm test
 
 ---
 
+## Admin / Test console
+
+Click the **⚙ gear** in the top-right of the dashboard (or go to **`/admin`**) to
+open a built-in test console. It loads the current auction and lets you:
+
+- **Edit** any value — item bids, bidders, close times, the featured item,
+  ticket bids, per-group cascade start, and the timing settings.
+- **Simulate bids** with the `+$` buttons (stamps the bid time, so you can watch
+  the 1-minute anti-snipe extension and the ticket cascade react live).
+- **Fast-forward the clock** (`+30s` … `+15m`) to watch items close and the
+  cascade roll without waiting.
+- **Reset** back to the source data at any time.
+
+A live preview of the real dashboard sits on the right, driven by the same
+auction engine. **Changes in the console stay in your browser** — they don't
+touch the live dashboard on other screens or your Google Sheet. (Writing edits
+back to the sheet for live, shared control is a planned follow-up.)
+
 ## Connect your Google Sheet
+
+> **New to this?** Follow the click-by-click
+> [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) — it covers everything below from
+> scratch, including an importable sheet template in `docs/sheet-template/`.
 
 ### 1. Build the sheet
 Create a Google Sheet with three tabs — `Items`, `Tickets`, `Config` — following
@@ -168,8 +190,9 @@ correct even if the TV's clock is off.
 ```
 app/
   page.tsx            Dashboard (client): polls /api/state, renders, ticks countdowns
+  admin/page.tsx      Admin / test console (browser-local edits + live preview)
   api/state/route.ts  Reads the sheet (or demo) and returns computed AuctionState
-components/           FeaturedItem, TicketPanel, BidList, Countdown
+components/           DashboardView, FeaturedItem, TicketPanel, TicketGroupSummary, BidList, Countdown
 lib/
   auction.ts          Pure auction engine (anti-snipe + ticket cascade)
   auction.test.ts     Unit tests for the rules above

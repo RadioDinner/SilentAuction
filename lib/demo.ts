@@ -9,31 +9,36 @@ export function buildDemoData(nowMs: number): AuctionData {
     new Date(nowMs + offsetSec * 1000).toISOString();
   const MIN = 60;
 
-  // Ticket bids — note "10 of 12" is the high ticket at $50, per the brief.
-  const ticketBids: Record<string, number> = {
-    "1 of 12": 40,
-    "2 of 12": 25,
-    "3 of 12": 30,
-    "4 of 12": 22,
-    "5 of 12": 35,
-    "6 of 12": 28,
-    "7 of 12": 45,
-    "8 of 12": 20,
-    "9 of 12": 33,
-    "10 of 12": 50,
-    "11 of 12": 38,
-    "12 of 12": 42,
-  };
-  const tickets: TicketItem[] = Object.entries(ticketBids).map(
-    ([label, bid], i) => ({
-      group: "Suite Tickets",
+  // A few ticket groups, each with its own cascade start, to show how multiple
+  // groups stagger and how the dashboard spotlights the soonest-closing one.
+  const makeGroup = (
+    group: string,
+    bids: Record<string, number>,
+    startOffsetSec: number,
+  ): TicketItem[] =>
+    Object.entries(bids).map(([label, bid], i) => ({
+      group,
       label,
-      imageUrl: "https://picsum.photos/seed/suite-tickets/1000/750",
       currentBid: bid,
       highBidder: `Paddle ${10 + i}`,
       lastBidISO: iso(-3 * MIN),
-    }),
-  );
+      cascadeStartISO: iso(startOffsetSec),
+    }));
+
+  const tickets: TicketItem[] = [
+    // Closes soonest -> this group is the spotlight on the dashboard.
+    ...makeGroup("Dinner Tickets", { "1 of 4": 60, "2 of 4": 45, "3 of 4": 40, "4 of 4": 35 }, 45),
+    ...makeGroup(
+      "Lunch Tickets",
+      {
+        "1 of 12": 40, "2 of 12": 25, "3 of 12": 30, "4 of 12": 22,
+        "5 of 12": 35, "6 of 12": 28, "7 of 12": 45, "8 of 12": 20,
+        "9 of 12": 33, "10 of 12": 50, "11 of 12": 38, "12 of 12": 42,
+      },
+      150,
+    ),
+    ...makeGroup("Fishing Trip", { "1 of 3": 120, "2 of 3": 120, "3 of 3": 100 }, 300),
+  ];
 
   return {
     config: {

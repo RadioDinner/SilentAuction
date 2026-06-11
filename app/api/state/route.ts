@@ -25,7 +25,18 @@ export async function GET(req: NextRequest) {
   } else {
     try {
       const data = await getAuctionDataFromSheet();
-      state = computeState(data, now, "sheet");
+      let warn: string | undefined;
+      if (data.items.length === 0 && data.tickets.length === 0) {
+        warn =
+          "Connected to the sheet but found no items or tickets. Check that tabs are named exactly Items / Tickets / Config with headers in row 1. Visit /api/diag for details.";
+      } else if (data.items.length === 0) {
+        warn =
+          "Connected to the sheet but the Items tab returned no rows. Confirm the tab is named exactly 'Items' with a header row. Visit /api/diag for details.";
+      } else if (data.tickets.length === 0) {
+        warn =
+          "Connected to the sheet but the Tickets tab returned no rows. Confirm the tab is named exactly 'Tickets'. Visit /api/diag for details.";
+      }
+      state = computeState(data, now, "sheet", warn);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       state = computeState(

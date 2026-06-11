@@ -1,0 +1,9 @@
+Key,Value
+event_name,Company Picnic Silent Auction
+timezone,America/New_York
+event_date,2026-07-18
+extension_window_seconds,60
+ticket_cascade_start,7:00 PM
+ticket_countdown_seconds,120
+urgent_threshold_seconds,120
+featured_item_id,

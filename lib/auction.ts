@@ -131,10 +131,13 @@ export function computeTicketGroup(
 ): TicketGroupState {
   const windowMs = config.extensionWindowSeconds * 1000;
   const countdownMs = config.ticketCountdownSeconds * 1000;
-  // If no cascade start is configured, give the first ticket a full countdown
+  // A per-group start (set on any row of the group) wins over the global
+  // config value. If neither is set, give the first ticket a full countdown
   // from "now" rather than closing instantly.
-  const cascadeStartMs =
-    toMs(config.ticketCascadeStartISO) ?? nowMs + countdownMs;
+  const groupStartISO =
+    groupTickets.find((t) => t.cascadeStartISO)?.cascadeStartISO ??
+    config.ticketCascadeStartISO;
+  const cascadeStartMs = toMs(groupStartISO) ?? nowMs + countdownMs;
 
   const sorted = [...groupTickets].sort(compareTickets);
 

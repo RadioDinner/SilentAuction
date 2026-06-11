@@ -143,3 +143,59 @@ e. CURRENT STATE
   - Not yet connected to a real Google Sheet (awaiting user's sheet + creds).
   - Not deployed to Vercel yet (awaiting user).
   - No PR opened (not requested).
+
+
+ADDENDUM (later in Session 1)
+----------------------------
+- Merged work to `main` and pushed (origin/main). Continued committing to main.
+- Vercel: no Vercel tooling in this session; guided the user. They chose to do a
+  demo-mode deploy first (zero config), then wire Google. Prepped:
+    * docs/SETUP_GUIDE.md (from-scratch Vercel + Google service account walkthrough)
+    * docs/sheet-template/{Items,Tickets,Config}.csv importable templates
+- USER PROVIDED REAL DATA (38 rows) and asked to rebuild it for Google Sheets.
+  Built docs/Silent-Auction-Import.xlsx (3 tabs) + CSVs via SheetJS (generator
+  kept in /tmp, not committed; reinstall `xlsx` --no-save to regenerate).
+    * Split: 10 unique items -> Items; 28 tickets in 5 cascade groups -> Tickets
+      (Sales Office Lunch x12, Rib Dinner x4, Lake Erie Fishing x3, Kratzer Steak
+      x2, Wings & Bucket Golf x6 + spectator).
+    * Data fixes: Steak "1 of 2" appeared twice -> 2nd became "2 of 2"; spectator
+      ticket grouped into Wings as "Spectator (2 people)"; light name cleanups;
+      donor info -> Description; logistics -> Notes column; preserved staff
+      tracking columns (Winner Phone / Paid? / Picked Up?, empty).
+- USER DECISIONS (Q&A): all 5 ticket sets CASCADE; user will provide EXACT close
+  times (placeholders for now: items 6:00-6:45pm staggered; group cascade starts
+  7:00/7:20/7:35/7:45/7:55pm). Timezone guessed America/New_York, event_date
+  2026-07-18 (BOTH need user confirmation).
+- FEATURE ADDED: per-group cascade start. New optional "Cascade Start" column on
+  the Tickets tab (set on one row per group); falls back to Config
+  ticket_cascade_start. Touched: types.ts (TicketItem.cascadeStartISO),
+  auction.ts (computeTicketGroup resolves per-group start), sheets.ts (parses the
+  column), auction.test.ts (+1 test, 19 total passing), demo.ts (now 3 groups).
+- LAYOUT ADDED: multi-group dashboard. New components/TicketGroupSummary.tsx;
+  app/page.tsx spotlights the soonest-closing group (full TicketPanel) and shows
+  the rest as compact cards (2-col grid). Verified via screenshot.
+- STILL OPEN: user to send exact close times + cascade starts, confirm
+  timezone/event_date, confirm the spectator-ticket grouping, then deploy +
+  wire Google creds (SETUP_GUIDE.md). Build + 19 tests green.
+
+ADMIN / TEST CONSOLE (prompt 4)
+-------------------------------
+- User decision (Q&A): "Both (test now, live later)" — build an in-browser test
+  console now; add Google Sheet WRITE-BACK for live shared control later (Phase 2,
+  NOT yet built).
+- Built Phase 1:
+    * components/DashboardView.tsx — extracted the dashboard render so it's reused
+      by both / and the admin preview (page.tsx now just polls + renders it).
+    * app/page.tsx — adds a ⚙ gear button (adminHref="/admin") to the dashboard.
+    * app/admin/page.tsx — the console: edit items/tickets/config, simulate bids
+      (+$ buttons stamp lastBid=preview-now to trigger anti-snipe/cascade),
+      fast-forward clock (+30s..+15m via shiftMs), Reset/Reload from source, and a
+      LIVE PREVIEW (right pane) computed in-browser with the pure computeState().
+      Edits persist to localStorage ("auction-admin-data-v1"); browser-local only,
+      does NOT affect the live dashboard or the sheet.
+- Verified: build clean, 19 tests pass, screenshot + interaction test (placing a
+  +$100 bid moved preview $1,500->$1,600; +30m fast-forward closed items and
+  switched the featured item / closed the ticket group).
+- PHASE 2 (open): write admin edits back to the Google Sheet (needs service
+  account WRITE scope: change spreadsheets.readonly -> spreadsheets, add a write
+  API route + Save buttons) so one admin can drive the shared TV live.
