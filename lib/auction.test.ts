@@ -190,6 +190,23 @@ describe("computeTicketGroup (cascade, highest closes first)", () => {
   });
 });
 
+describe("computeTicketGroup per-group cascade start", () => {
+  const tickets: TicketItem[] = [
+    { group: "Dinner", label: "1 of 2", currentBid: 50 },
+    // start set on any one row of the group overrides the global config value
+    { group: "Dinner", label: "2 of 2", currentBid: 30, cascadeStartISO: "2026-06-11T19:30:00.000Z" },
+  ];
+
+  it("uses the group's own start, not the global ticket_cascade_start", () => {
+    const now = ms("2026-06-11T19:29:00.000Z");
+    const g = computeTicketGroup("Dinner", tickets, baseConfig, now);
+    // baseConfig.ticketCascadeStartISO is 18:00; this group should start 19:30
+    expect(g.tickets[0].effectiveCloseISO).toBe("2026-06-11T19:30:00.000Z");
+    expect(g.tickets[1].effectiveCloseISO).toBe("2026-06-11T19:33:00.000Z");
+    expect(g.activeTicketId).toBe("Dinner::1 of 2");
+  });
+});
+
 describe("resolveFeaturedId", () => {
   const now = ms("2026-06-11T17:00:00.000Z");
   const items: RegularItem[] = [

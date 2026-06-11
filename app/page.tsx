@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { AuctionState } from "@/lib/types";
 import { FeaturedItem } from "@/components/FeaturedItem";
 import { TicketPanel } from "@/components/TicketPanel";
+import { TicketGroupSummary } from "@/components/TicketGroupSummary";
 import { BidList } from "@/components/BidList";
-import { formatClock } from "@/lib/format";
+import { formatClock, secsLeft } from "@/lib/format";
 
 const POLL_SECONDS = Number(process.env.NEXT_PUBLIC_POLL_SECONDS) || 3;
 
@@ -59,6 +60,16 @@ export default function Dashboard() {
   const featured = state.items.find((i) => i.id === state.featuredItemId);
   const groups = state.ticketGroups;
 
+  // Spotlight the group closing soonest; show the rest as compact cards.
+  const groupUrgency = (g: (typeof groups)[number]) => {
+    const open = g.tickets.filter((t) => t.status !== "closed");
+    if (open.length === 0) return Number.POSITIVE_INFINITY;
+    return Math.min(...open.map((t) => secsLeft(t.effectiveCloseISO, nowMs)));
+  };
+  const sortedGroups = [...groups].sort((a, b) => groupUrgency(a) - groupUrgency(b));
+  const spotlight = sortedGroups[0];
+  const otherGroups = sortedGroups.slice(1);
+
   return (
     <main className="flex h-screen flex-col gap-4 p-4">
       <header className="flex items-center justify-between">
@@ -92,16 +103,21 @@ export default function Dashboard() {
         }`}
       >
         <FeaturedItem item={featured} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
-        {groups.length > 0 && (
-          <div className="flex min-h-0 flex-col gap-4">
-            {groups.map((g) => (
-              <TicketPanel
-                key={g.group}
-                group={g}
-                nowMs={nowMs}
-                urgentSeconds={urgent}
-              />
-            ))}
+        {spotlight && (
+          <div className="flex min-h-0 flex-col gap-3">
+            <TicketPanel group={spotlight} nowMs={nowMs} urgentSeconds={urgent} />
+            {otherGroups.length > 0 && (
+              <div className="grid shrink-0 grid-cols-2 gap-3">
+                {otherGroups.map((g) => (
+                  <TicketGroupSummary
+                    key={g.group}
+                    group={g}
+                    nowMs={nowMs}
+                    urgentSeconds={urgent}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

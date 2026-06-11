@@ -57,6 +57,9 @@ export interface TicketItem {
   currentBid?: number;
   highBidder?: string;
   lastBidISO?: string;
+  /** Optional per-group cascade start (when the highest ticket closes). ISO.
+   *  Set on any one row of the group; falls back to the global config value. */
+  cascadeStartISO?: string;
 }
 
 /** Everything parsed out of the sheet (or demo source) before computation. */

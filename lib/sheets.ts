@@ -156,6 +156,11 @@ function parseTickets(rows: Row[], eventDateISO: string | undefined, tz: string)
         eventDateISO,
         tz,
       ),
+      cascadeStartISO: parseSheetTime(
+        pick(row, hi, ["cascadestart", "groupstart", "starttime", "groupclosestart", "closestart"]),
+        eventDateISO,
+        tz,
+      ),
     });
   }
   return tickets;
