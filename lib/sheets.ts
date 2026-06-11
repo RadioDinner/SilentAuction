@@ -6,6 +6,7 @@ import { google } from "googleapis";
 import type { AuctionData, RegularItem, TicketItem } from "./types";
 import { norm, parseConfig } from "./config";
 import { parseSheetTime } from "./time";
+import { normalizePrivateKey } from "./private-key";
 
 const ITEMS_TAB = process.env.SHEET_ITEMS_TAB || "Items";
 const TICKETS_TAB = process.env.SHEET_TICKETS_TAB || "Tickets";
@@ -25,7 +26,7 @@ export function hasSheetCredentials(): boolean {
 function sheetsClient() {
   const auth = new google.auth.JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+    key: normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
   return google.sheets({ version: "v4", auth });
@@ -281,7 +282,8 @@ export async function getDiagnostics(): Promise<SheetDiagnostics> {
     } else if (/permission|forbidden|403/i.test(message)) {
       hint = `The sheet isn't shared with the service account. Share it (Viewer) with ${serviceAccountEmail}.`;
     } else if (/invalid_grant|DECODER|PEM|private key|invalid.*key/i.test(message)) {
-      hint = "GOOGLE_PRIVATE_KEY looks malformed. Paste the whole key including the BEGIN/END lines; keep the \\n sequences.";
+      hint =
+        "GOOGLE_PRIVATE_KEY is malformed. In the Vercel field, paste ONLY the private_key value from the JSON (the -----BEGIN…END----- block with its \\n sequences) — no surrounding quotes. Then redeploy.";
     }
     return {
       hasCredentials: true,
