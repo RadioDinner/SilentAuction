@@ -24,3 +24,15 @@ I want to host the auction data in a google sheet, where our staff will be takin
 
 2. merge to main to start, help with the vercel project
 
+3. [User pasted their offline Excel auction data — 38 rows with columns: Item #,
+   Item Description, Donated By / Purchased At, Est. Retail Value or Cost,
+   Starting Bid ($), Winning Bid ($), Winner Name, Winner Phone Number, Paid?,
+   Picked Up?, Notes. Rows include unique items (E-Bike, croquet, Milwaukee tool
+   set, espresso machine, Ruger rifle, St. Croix rod, TenPoint crossbow, crappie
+   fillets, link sausage, bow hunt) plus several identical-ticket groups: Sales
+   office lunch ticket 1-12 of 12, Peter & Aaron Rib Dinner 1-4 of 4, Lake Erie
+   Fishing Trip tickets 1-3, Kratzer Steak Dinner 1-2, and Wings & Bucket Golf at
+   Albert's tickets 1-6 + a spectator ticket.]
+   "Here is our offline, Excel sheet with current data. Can you rebuild the data
+   into a file I an import into Google Sheets with all the tabs and jazz"
+
