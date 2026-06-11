@@ -205,6 +205,59 @@ describe("computeTicketGroup per-group cascade start", () => {
     expect(g.tickets[1].effectiveCloseISO).toBe("2026-06-11T19:33:00.000Z");
     expect(g.activeTicketId).toBe("Dinner::1 of 2");
   });
+
+  it("treats one shared start time across all rows as a single cascade start", () => {
+    // Every row carries the SAME time -> that's a group start, not per-ticket
+    // times, so the cascade spacing still applies.
+    const shared: TicketItem[] = [
+      { group: "Lunch", label: "1 of 3", currentBid: 50, cascadeStartISO: "2026-06-11T18:30:00.000Z" },
+      { group: "Lunch", label: "2 of 3", currentBid: 40, cascadeStartISO: "2026-06-11T18:30:00.000Z" },
+      { group: "Lunch", label: "3 of 3", currentBid: 30, cascadeStartISO: "2026-06-11T18:30:00.000Z" },
+    ];
+    const now = ms("2026-06-11T18:29:00.000Z");
+    const g = computeTicketGroup("Lunch", shared, baseConfig, now);
+    expect(g.tickets[0].effectiveCloseISO).toBe("2026-06-11T18:30:00.000Z");
+    expect(g.tickets[1].effectiveCloseISO).toBe("2026-06-11T18:33:00.000Z");
+    expect(g.tickets[2].effectiveCloseISO).toBe("2026-06-11T18:36:00.000Z");
+  });
+});
+
+describe("computeTicketGroup per-ticket close times", () => {
+  // Each ticket carries its own distinct close time (like a real sheet with a
+  // Cascade Start filled on every row), out of label order on purpose.
+  const tickets: TicketItem[] = [
+    { group: "Lunch", label: "1 of 3", currentBid: 50, cascadeStartISO: "2026-06-11T17:50:00.000Z" },
+    { group: "Lunch", label: "2 of 3", currentBid: 20, cascadeStartISO: "2026-06-11T17:52:00.000Z" },
+    { group: "Lunch", label: "3 of 3", currentBid: 99, cascadeStartISO: "2026-06-11T17:51:00.000Z" },
+  ];
+
+  it("honors each ticket's own close time, ordered soonest-first (not by bid)", () => {
+    const now = ms("2026-06-11T17:49:00.000Z");
+    const g = computeTicketGroup("Lunch", tickets, baseConfig, now);
+    expect(g.tickets.map((t) => t.label)).toEqual(["1 of 3", "3 of 3", "2 of 3"]);
+    expect(g.tickets.map((t) => t.effectiveCloseISO)).toEqual([
+      "2026-06-11T17:50:00.000Z",
+      "2026-06-11T17:51:00.000Z",
+      "2026-06-11T17:52:00.000Z",
+    ]);
+    expect(g.activeTicketId).toBe("Lunch::1 of 3");
+    expect(g.openCount).toBe(3);
+  });
+
+  it("applies anti-snipe per ticket without shifting the others", () => {
+    // A wire bid on the soonest ticket extends only that one.
+    const bid = [
+      { ...tickets[0], lastBidISO: "2026-06-11T17:49:55.000Z" }, // +60s -> 17:50:55
+      tickets[1],
+      tickets[2],
+    ];
+    const now = ms("2026-06-11T17:49:58.000Z");
+    const g = computeTicketGroup("Lunch", bid, baseConfig, now);
+    const first = g.tickets.find((t) => t.label === "1 of 3")!;
+    const third = g.tickets.find((t) => t.label === "3 of 3")!;
+    expect(first.effectiveCloseISO).toBe("2026-06-11T17:50:55.000Z");
+    expect(third.effectiveCloseISO).toBe("2026-06-11T17:51:00.000Z"); // unchanged
+  });
 });
 
 describe("resolveFeaturedId", () => {

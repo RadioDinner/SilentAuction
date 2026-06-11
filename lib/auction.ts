@@ -119,6 +119,29 @@ function compareTickets(a: TicketItem, b: TicketItem): number {
   return a.label.localeCompare(b.label, undefined, { numeric: true });
 }
 
+/** Sort comparator for explicit per-ticket close times: soonest first; tickets
+ *  without a time trail the rest, ordered by natural label. */
+function compareTicketTimes(a: TicketItem, b: TicketItem): number {
+  const am = toMs(a.cascadeStartISO);
+  const bm = toMs(b.cascadeStartISO);
+  if (am != null && bm != null && am !== bm) return am - bm;
+  if (am != null && bm == null) return -1;
+  if (am == null && bm != null) return 1;
+  return a.label.localeCompare(b.label, undefined, { numeric: true });
+}
+
+/** Count of DISTINCT cascade-start times across a group. When 2+ tickets carry
+ *  different times, the sheet is giving each ticket its own close time (rather
+ *  than one shared start for the whole group). */
+function distinctStartCount(tickets: TicketItem[]): number {
+  const set = new Set<number>();
+  for (const t of tickets) {
+    const ms = toMs(t.cascadeStartISO);
+    if (ms != null) set.add(ms);
+  }
+  return set.size;
+}
+
 export function ticketId(t: Pick<TicketItem, "group" | "label">): string {
   return `${t.group}::${t.label}`;
 }
@@ -131,22 +154,36 @@ export function computeTicketGroup(
 ): TicketGroupState {
   const windowMs = config.extensionWindowSeconds * 1000;
   const countdownMs = config.ticketCountdownSeconds * 1000;
-  // A per-group start (set on any row of the group) wins over the global
-  // config value. If neither is set, give the first ticket a full countdown
-  // from "now" rather than closing instantly.
-  const groupStartISO =
-    groupTickets.find((t) => t.cascadeStartISO)?.cascadeStartISO ??
-    config.ticketCascadeStartISO;
-  const cascadeStartMs = toMs(groupStartISO) ?? nowMs + countdownMs;
 
-  const sorted = [...groupTickets].sort(compareTickets);
-
-  // Forward-simulate the close time of each ticket in close order.
+  let sorted: TicketItem[];
   const closeMs: number[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    const baseMs = i === 0 ? cascadeStartMs : closeMs[i - 1] + countdownMs;
-    const lastBidMs = toMs(sorted[i].lastBidISO);
-    closeMs[i] = effectiveCloseMs(baseMs, lastBidMs, windowMs);
+
+  if (distinctStartCount(groupTickets) >= 2) {
+    // PER-TICKET MODE: the sheet gives each ticket its own close time. Honor it
+    // exactly (with anti-snipe per ticket); order by that time. Any ticket
+    // missing a time trails the previous one by one countdown.
+    sorted = [...groupTickets].sort(compareTicketTimes);
+    for (let i = 0; i < sorted.length; i++) {
+      const own = toMs(sorted[i].cascadeStartISO);
+      const baseMs = own ?? (i === 0 ? nowMs + countdownMs : closeMs[i - 1] + countdownMs);
+      closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
+    }
+  } else {
+    // CASCADE MODE: one start time for the whole group (set on any row, else the
+    // global config value), highest bid closes first, each subsequent ticket
+    // closes `countdown` after the previous — so a late bid on the active ticket
+    // pushes all remaining tickets out together. If no start is set, give the
+    // first ticket a full countdown from "now" rather than closing instantly.
+    const groupStartISO =
+      groupTickets.find((t) => t.cascadeStartISO)?.cascadeStartISO ??
+      config.ticketCascadeStartISO;
+    const cascadeStartMs = toMs(groupStartISO) ?? nowMs + countdownMs;
+
+    sorted = [...groupTickets].sort(compareTickets);
+    for (let i = 0; i < sorted.length; i++) {
+      const baseMs = i === 0 ? cascadeStartMs : closeMs[i - 1] + countdownMs;
+      closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
+    }
   }
 
   // The active ticket is the first one not yet closed.

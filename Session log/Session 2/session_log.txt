@@ -152,3 +152,86 @@ ADDENDUM (prompt 3) — REMOVE BIDDER + FIX CLOSE-TIME PARSING (important)
   "at H:MM PM" line shows the real close clock. 44 tests pass, build clean.
 - STILL relevant: confirm Config timezone + event_date so anchoring is right; the
   tickets need cascade-start times in the same (now-supported) format or a clock.
+
+
+ADDENDUM (prompt 4) — NO-SCROLL LIST + PER-TICKET CLOSE TIMES
+------------------------------------------------------------
+Two asks: (a) the "All Current High Bids" card had a hidden scrollbar / clipped;
+make everything fit on one card with no scroll. (b) Tickets weren't honoring the
+Close Time — the sheet now has a per-row "Cascade Start" time on EVERY ticket
+(5:50, 5:51, 5:52 ... 6:17), but the engine only used ONE start per group.
+
+(a) NO-SCROLL LIST — components/BidList.tsx
+  - Removed the overflow-y-auto / no-scrollbar wrapper (that was the "hidden
+    scrollbar"). The card now renders all rows with CSS multi-column
+    (columns-2 lg:columns-3 xl:columns-4) + break-inside-avoid, top-down then
+    left-to-right, nothing clipped.
+  - Tightened rows (text-base, py-0.5) and trimmed the spotlight cards from
+    min-h-[30vh] to min-h-[26vh] (SpotlightCard.tsx) to make room.
+  - Verified headlessly: the card's scrollHeight === clientHeight (no scroll),
+    all 38 rows visible on a 1920x1080 screenshot of the user's real data.
+  - Tickets in the list now show their actual close CLOCK TIME (like items),
+    instead of the words "up next/closing" — directly honoring the sheet times.
+
+(b) PER-TICKET CLOSE TIMES — lib/auction.ts (computeTicketGroup)
+  - THE KEY CHANGE. Two modes now, chosen automatically by DISTINCT cascade-start
+    count in the group:
+      * >= 2 distinct times  -> PER-TICKET MODE: each ticket closes at its own
+        listed time (anti-snipe applied per ticket), ordered soonest-first.
+      * 0 or 1 distinct time -> CASCADE MODE (unchanged legacy): one group start,
+        highest bid first, each ticket = previous + ticketCountdownSeconds, so a
+        late bid pushes all remaining out together.
+  - Detection is by DISTINCT value on purpose: demo.ts sets the SAME start on
+    every row of a group (that's a group start, must stay cascade) whereas the
+    user's sheet sets a DIFFERENT time per row (per-ticket). Helper
+    distinctStartCount() + comparator compareTicketTimes() added.
+  - Backward compatible: legacy cascade tests and the per-group-start test still
+    pass; demo still cascades.
+  - Tradeoff: in PER-TICKET MODE the "a bid extends ALL remaining tickets" rule
+    does NOT apply (only per-ticket anti-snipe) — explicit times are independent.
+    The original cascade extend-all still works in CASCADE MODE. If the user
+    wants extend-all WITH explicit per-ticket times, that's a future option.
+
+ALSO this session (prompt 3, recap): removed High Bidder from the dashboard and
+fixed the Google Sheets long-date parsing — see the prompt-3 addendum above.
+
+TESTS / VERIFICATION
+  - 47 tests pass (added 3: per-ticket honor+ordering, per-ticket anti-snipe,
+    and "shared identical start stays cascade"). Build clean.
+  - End-to-end check with the user's REAL data loaded as a temporary demo
+    (anchored to today in America/New_York, then reverted): /api/state showed
+    E-Bike open, closes 5:30 PM, ~16 min left; Sales Office Lunch active = "1 of
+    12" closing at its sheet time 5:50 PM. Screenshot confirmed: Now Closing =
+    E-Bike 16:38, Next Up = Flag Croquet, no bidder names, 38 rows on one card.
+
+=========================== SESSION 2 WRAP ===========================
+WHAT THIS SESSION DELIVERED (branch claude/great-shannon-qz1snq):
+  1. Phase 2 "Save to Sheet" write-back from /admin (token-gated, read-only by
+     default). [commit: live Save-to-Sheet write-back]
+  2. Dashboard redesign: "Now Closing" + "Next Up" cards over a single closing
+     timeline; everything else in top-down/left-to-right columns. Deleted the old
+     FeaturedItem / TicketPanel / TicketGroupSummary. [commit: redesign dashboard]
+  3. Removed High Bidder from the public dashboard; fixed Google Sheets long-date
+     close-time parsing (the 23:59:59-reset bug). [commit: remove high bidder ...]
+  4. "All Current High Bids" no longer scrolls (single card); tickets honor their
+     own per-row Close/Cascade-Start times. [this commit]
+
+KNOWN-GOOD: npm test (47) + npm run build both clean. Verified via headless
+screenshots against the user's real data.
+
+OPEN ITEMS / NEXT SESSION:
+  - DEPLOY: all fixes are on the branch only. The live Vercel TV won't reflect
+    them until this branch is deployed or merged. User has not asked for a PR yet.
+  - CONFIG: confirm Config `timezone` (data is Eastern -> America/New_York) and
+    `event_date`; close times have a date but no zone, so a wrong tz shifts every
+    countdown by hours.
+  - LIVE SHEET CONNECTION: still unverified end-to-end against the real sheet
+    (needs the user's creds). /api/diag is the tool. The "no data" thread from the
+    start of the session was never reproduced/closed.
+  - LIVE EDITING: to enable Save-to-Sheet, set ADMIN_TOKEN + give the service
+    account Editor access (README "Save to Sheet").
+  - TICKET RULE DECISION: confirm whether per-ticket explicit times should ALSO
+    extend-all-remaining on a late bid (currently per-ticket anti-snipe only).
+  - The demo dataset (lib/demo.ts) still uses the old 3-group sample; fine for
+    previews. It was only swapped temporarily for verification and reverted.
+======================================================================

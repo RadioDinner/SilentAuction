@@ -45,40 +45,39 @@ export function BidList({
         bid: t.currentBid,
         closed: t.status === "closed",
         closing: t.status === "active",
-        secondary:
-          t.status === "closed" ? "closed" : t.status === "active" ? "closing" : "up next",
+        secondary: t.status === "closed" ? "closed" : formatClock(t.effectiveCloseISO, tz),
       });
     }
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
       <h2 className="mb-2 shrink-0 text-xl font-extrabold uppercase tracking-[0.2em] text-slate-300">
         All Current High Bids
       </h2>
-      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
-        <div className="columns-1 gap-x-8 sm:columns-2 lg:columns-3 2xl:columns-4">
-          {rows.map((r) => (
-            <div
-              key={r.key}
-              className={`flex break-inside-avoid items-baseline justify-between border-b border-white/5 py-1 ${
-                r.closed ? "opacity-45" : ""
-              }`}
-            >
-              <span className="truncate pr-3 text-lg text-slate-100">{r.label}</span>
-              <span className="flex items-baseline gap-2 whitespace-nowrap">
-                <span className="text-lg font-bold tabular-nums">{formatMoney(r.bid)}</span>
-                <span
-                  className={`text-xs uppercase tracking-wide ${
-                    r.closing ? "text-red-300" : "text-slate-400"
-                  }`}
-                >
-                  {r.secondary}
-                </span>
+      {/* Everything fits on the card — no scrolling. Columns fill top-down then
+          left-to-right. */}
+      <div className="columns-2 gap-x-8 lg:columns-3 xl:columns-4">
+        {rows.map((r) => (
+          <div
+            key={r.key}
+            className={`flex break-inside-avoid items-baseline justify-between border-b border-white/5 py-0.5 ${
+              r.closed ? "opacity-45" : ""
+            }`}
+          >
+            <span className="truncate pr-3 text-base text-slate-100">{r.label}</span>
+            <span className="flex items-baseline gap-2 whitespace-nowrap">
+              <span className="text-base font-bold tabular-nums">{formatMoney(r.bid)}</span>
+              <span
+                className={`text-xs tabular-nums ${
+                  r.closing ? "font-semibold text-red-300" : "text-slate-400"
+                }`}
+              >
+                {r.secondary}
               </span>
-            </div>
-          ))}
-        </div>
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   );

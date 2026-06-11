@@ -13,3 +13,9 @@
    Close Time we set in the sheet. [+ pasted 10 item rows whose Close Time cells
    read like "Thursday, June 11, 2026 at 5:30:00 PM"]. It should be counting
    down to 5:30 PM for ITEM 1 (E-Bike), not showing "at 4:55pm".
+
+4. Also, the "all current high bids" screen has a hidden scrollbar. remove that,
+   I don't want it to scroll. I want everything visible on a single card. [pasted
+   the rendered list] and it is also not honoring the close times. [pasted the
+   Tickets tab with a per-row "Cascade Start" time for every ticket, 5:50-6:17 PM].
+   After you fix this, write a session wrap and handoff doc.

@@ -49,7 +49,7 @@ export function SpotlightCard({
   if (!entry) {
     return (
       <section
-        className={`grid min-h-[30vh] place-items-center rounded-3xl border bg-white/5 ${v.ring}`}
+        className={`grid min-h-[26vh] place-items-center rounded-3xl border bg-white/5 ${v.ring}`}
       >
         <div className="text-center">
           <div className={`text-sm font-bold uppercase tracking-[0.3em] ${v.accent}`}>{v.label}</div>
@@ -61,7 +61,7 @@ export function SpotlightCard({
 
   return (
     <section
-      className={`relative flex min-h-[30vh] flex-col overflow-hidden rounded-3xl border bg-slate-900 ${v.ring}`}
+      className={`relative flex min-h-[26vh] flex-col overflow-hidden rounded-3xl border bg-slate-900 ${v.ring}`}
     >
       {entry.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
