@@ -296,6 +296,28 @@ describe("computeTicketGroup uses per-row times as a bid-ordered schedule", () =
   });
 });
 
+describe("scheduledCloseISO is a stable ordering key", () => {
+  it("a wire bid extends effectiveClose but NOT the active ticket's scheduledClose", () => {
+    const at = (clock: string) => `2026-06-12T${clock}:00-04:00`;
+    const tickets: TicketItem[] = [
+      { group: "G", label: "1 of 3", currentBid: 70, cascadeStartISO: at("10:25") },
+      { group: "G", label: "2 of 3", currentBid: 50, cascadeStartISO: at("10:26") },
+      { group: "G", label: "3 of 3", currentBid: 40, cascadeStartISO: at("10:27") },
+    ];
+    const now = ms("2026-06-12T10:24:30-04:00");
+    const before = computeTicketGroup("G", tickets, baseConfig, now).tickets[0];
+
+    // Bid $80 on the active ($70) ticket at its 10:25 close -> effectiveClose +1m.
+    const bumped = tickets.map((t, i) =>
+      i === 0 ? { ...t, currentBid: 80, lastBidISO: at("10:25") } : t,
+    );
+    const after = computeTicketGroup("G", bumped, baseConfig, now).tickets[0];
+
+    expect(after.effectiveCloseISO).not.toBe(before.effectiveCloseISO); // extended
+    expect(after.scheduledCloseISO).toBe(before.scheduledCloseISO); // stable -> no card flip
+  });
+});
+
 describe("computeTicketGroup seats / outbid", () => {
   it("with more bids than seats, the lowest-ranked bids are outbid", () => {
     const tickets: TicketItem[] = [

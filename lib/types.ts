@@ -82,6 +82,9 @@ export interface ComputedItem extends RegularItem {
   status: ItemStatus;
   /** Close time after anti-snipe extension. ISO. */
   effectiveCloseISO: string;
+  /** Scheduled close BEFORE anti-snipe — a stable key for ordering that doesn't
+   *  jump when a bid extends the close. ISO. */
+  scheduledCloseISO: string;
   /** Whole seconds remaining at compute time (0 if closed). */
   secondsLeft: number;
 }
@@ -94,6 +97,9 @@ export interface ComputedTicket extends TicketItem {
   status: TicketStatus;
   /** Projected/effective close time after extensions. ISO. */
   effectiveCloseISO: string;
+  /** Scheduled close BEFORE this ticket's anti-snipe bump — a stable key for
+   *  ordering that doesn't jump when a bid extends the close. ISO. */
+  scheduledCloseISO: string;
   /** Whole seconds remaining at compute time (0 if closed). */
   secondsLeft: number;
 }

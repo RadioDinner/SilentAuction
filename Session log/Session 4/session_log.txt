@@ -155,3 +155,14 @@ ADDENDUM 3 — bid extends the Now Closing timer, no write-back
 - CAVEAT (documented): the memory is per server instance and non-durable; a
   redeploy/cold start resets the baseline (and would drop an in-flight
   extension). Fine for a one-day single-endpoint event.
+
+ADDENDUM 4 — stop the Now Closing cards flipping
+------------------------------------------------
+- The two cards were ordered by LIVE seconds-remaining, so an anti-snipe bid (or
+  countdowns crossing) made them swap places.
+- Fix: engine now emits `scheduledCloseISO` (close BEFORE that ticket/item's own
+  anti-snipe bump) on ComputedTicket + ComputedItem. DashboardView orders the
+  spotlight lanes by scheduledClose (then lane id), so a bid still extends the
+  countdown shown but the card keeps its slot. SpotEntry gained `sortMs`.
+- +1 test (a wire bid changes effectiveCloseISO but not scheduledCloseISO). 63
+  pass; build clean. Verified demo still yields two distinct batch cards.

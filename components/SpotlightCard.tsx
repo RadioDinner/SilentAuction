@@ -14,6 +14,9 @@ export interface SpotEntry {
   sub?: string;
   bid?: number;
   closeISO: string;
+  /** Stable ordering key (scheduled close ms) so cards don't swap when a bid
+   *  extends a countdown. */
+  sortMs: number;
   secondsLeft: number;
   imageUrl?: string;
 }

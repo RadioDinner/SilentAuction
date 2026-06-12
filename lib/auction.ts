@@ -91,6 +91,7 @@ export function computeItem(
     ...item,
     status,
     effectiveCloseISO: new Date(effMs).toISOString(),
+    scheduledCloseISO: new Date(baseMs).toISOString(),
     secondsLeft: left,
   };
 }
@@ -270,7 +271,11 @@ export function computeTicketGroup(
   const anchorMs = slotTimes[0] ?? toMs(config.ticketCascadeStartISO) ?? nowMs + countdownMs;
 
   // Close times only for the WINNING seats; outbid bids have no countdown.
+  // `schedMs` is the close BEFORE that ticket's own anti-snipe bump — a stable
+  // key the dashboard uses to keep the "Now Closing" cards from swapping places
+  // when a bid extends one of them.
   const closeMs: number[] = [];
+  const schedMs: number[] = [];
   for (let i = 0; i < winnerCount; i++) {
     let baseMs: number;
     if (i === 0) {
@@ -282,6 +287,7 @@ export function computeTicketGroup(
       const gap = i < slotTimes.length ? Math.max(0, slotTimes[i] - slotTimes[i - 1]) : countdownMs;
       baseMs = closeMs[i - 1] + gap;
     }
+    schedMs[i] = baseMs;
     closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
   }
 
@@ -311,6 +317,7 @@ export function computeTicketGroup(
       rank: i,
       status,
       effectiveCloseISO: winner ? new Date(closeMs[i]).toISOString() : outbidCloseISO,
+      scheduledCloseISO: winner ? new Date(schedMs[i]).toISOString() : outbidCloseISO,
       secondsLeft: winner ? secondsLeft(closeMs[i], nowMs) : 0,
     };
   });

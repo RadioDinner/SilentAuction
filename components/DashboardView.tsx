@@ -7,9 +7,10 @@ import { formatClock, secsLeft } from "@/lib/format";
  * Pure presentation of an AuctionState at a given moment. Used by both the
  * live dashboard (/) and the admin test console's preview (/admin).
  *
- * Layout: two spotlight cards — "Now Closing" and "Next Up" — driven by a single
- * timeline that merges items and tickets and sorts by soonest close. Below them,
- * every item and ticket is listed in top-down, left-to-right columns.
+ * Layout: two "Now Closing" cards, each a different batch (or item), ordered by
+ * their SCHEDULED close so a bid that extends a countdown doesn't make the cards
+ * swap places. Below them, every item and ticket is listed in top-down,
+ * left-to-right columns.
  */
 export function DashboardView({
   state,
@@ -23,7 +24,9 @@ export function DashboardView({
   const tz = state.config.timezone;
   const urgent = state.config.urgentThresholdSeconds;
 
-  // Unified timeline of everything still open, soonest-closing first.
+  // Unified timeline of everything still open. Ordered by each entry's SCHEDULED
+  // close (not the live remaining time), so an anti-snipe bid extends a card's
+  // countdown without making the cards swap places.
   const open: SpotEntry[] = [];
   for (const it of state.items) {
     if (it.status === "closed") continue;
@@ -35,6 +38,7 @@ export function DashboardView({
       sub: it.description,
       bid: it.currentBid,
       closeISO: it.effectiveCloseISO,
+      sortMs: Date.parse(it.scheduledCloseISO),
       secondsLeft: secsLeft(it.effectiveCloseISO, nowMs),
       imageUrl: it.imageUrl,
     });
@@ -51,17 +55,14 @@ export function DashboardView({
         sub: `#${t.label}`,
         bid: t.currentBid,
         closeISO: t.effectiveCloseISO,
+        sortMs: Date.parse(t.scheduledCloseISO),
         secondsLeft: secsLeft(t.effectiveCloseISO, nowMs),
         imageUrl: t.imageUrl ?? g.imageUrl,
       });
     }
   }
-  open.sort(
-    (a, b) =>
-      a.secondsLeft - b.secondsLeft ||
-      a.closeISO.localeCompare(b.closeISO) ||
-      a.name.localeCompare(b.name),
-  );
+  // Stable ordering by scheduled close, then by lane, so positions don't flip.
+  open.sort((a, b) => a.sortMs - b.sortMs || a.lane.localeCompare(b.lane));
 
   // One spotlight per lane: keep only the soonest-closing entry from each ticket
   // group (its active ticket) and each item. This is what lets two different
