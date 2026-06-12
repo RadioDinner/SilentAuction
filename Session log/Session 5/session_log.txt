@@ -1,0 +1,44 @@
+SESSION 5 — LOG
+===============
+Date: 2026-06-12
+Project: Silent Auction Dashboard (company picnic)
+Branch: claude/keen-ride-y9pjfo (branched from main @ 579e7c3)
+
+a. SESSION 4 REVIEW (kickoff verification)
+------------------------------------------
+Re-ran Session 4's VERIFY block on a fresh clone of main (579e7c3):
+  - npm test          -> 63/63 pass
+  - npx tsc --noEmit  -> clean
+  - npm run build     -> clean
+  - GitHub branch state: cleanup is DONE. Only `main` remains on the remote
+    (default branch is main; all leftover claude/* branches deleted by the
+    user as planned in the Session 4 handoff).
+Session 4's handoff claims all check out. Nothing to fix.
+
+b. CARRIED-OVER ITEMS CLOSED AT KICKOFF
+---------------------------------------
+  1. docs/Silent-Auction-Import.xlsx REGENERATED from the CSVs in
+     docs/sheet-template/ — now has the Seats column and the latest batch
+     data (Config 8 keys, Items 10 rows, Tickets 28 rows incl. the separate
+     "Wings & Bucket Golf — Spectator" group).
+     The generator is now COMMITTED (it wasn't before):
+       scripts/build-import-xlsx.mjs
+     To rebuild after editing the CSVs:
+       npm install --no-save xlsx && node scripts/build-import-xlsx.mjs
+     (`xlsx` is deliberately NOT a project dependency.)
+  2. README step 4 retitled "(Optional) Auto-stamp bid times": the in-memory
+     bid detector (lib/bid-memory.ts, Session 4) extends the countdown
+     without Last Bid Time, so the onEdit Apps Script is optional. Noted
+     that Last Bid Time is still honored when present (later of the two wins).
+
+c. STILL OPEN (user-side, can't be done from a session)
+-------------------------------------------------------
+  - In the REAL Google Sheet: give the Wings spectator ticket its own Group
+    name (separate batch); keep group spellings consistent; set the Seats
+    column (one row per group).
+  - Confirm timezone / event_date / final close times in the Config tab.
+  - Wire Google creds (3 env vars) and deploy to Vercel (docs/SETUP_GUIDE.md
+    + README). Until creds are set the dashboard shows demo data.
+  - Keep AUCTION_WRITEBACK off (user wants no sheet write-back for the timer).
+  - Run ONE web session at a time — Session 4's branch mess came from
+    concurrent sessions branching off stale bases.

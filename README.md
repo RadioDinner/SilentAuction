@@ -164,14 +164,14 @@ GOOGLE_PRIVATE_KEY="<private_key from the JSON, with \n kept literal>"
 Restart `npm run dev`; the header's **Demo data** badge disappears once it's
 reading your sheet.
 
-### 4. (Recommended) Auto-stamp bid times
-So staff only type the bid amount, add the Apps Script in
+### 4. (Optional) Auto-stamp bid times
+The server already detects when a `Current Bid` goes up and extends the
+countdown on its own — no `Last Bid Time` needed. If you also want timestamps
+recorded in the sheet itself, add the Apps Script in
 [`google-apps-script/onEditTimestamp.gs`](google-apps-script/onEditTimestamp.gs):
 in the sheet, **Extensions → Apps Script**, paste the file, save, reload. It
 writes the `Last Bid Time` automatically whenever `Current Bid` changes.
-
-*(If you skip this, just type the time into `Last Bid Time` when you enter a bid —
-any reasonable time format works.)*
+(When present, `Last Bid Time` is still honored — the later of the two wins.)
 
 ---
 
