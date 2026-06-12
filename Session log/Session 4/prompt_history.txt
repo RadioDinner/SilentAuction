@@ -32,3 +32,28 @@ I want the highest ticket to start closing first. So in this case, it would be t
 
    [Clarifying answer: epic-edison = "Drop it (delete, don't merge)" — it was an
     abandoned parallel write-back; main already has write-back a different way.]
+
+4. I'll handle deletions
+
+5. Also, another change to "Tickets closing". On the two "Now closing" cards, I
+   want the tickets to be separated so that only 1 ticket from each batch is
+   closing at a time, but I can work at closing two batches at a time. So on one
+   "Now closing" card, the first 1 of 12 ticket for the sales office lunch would be
+   closing. On the other "now closing" card, it could be the first 1 of 4 rib
+   dinner tickets.
+   [+ pasted batch data: 6 batches, with the Wings & Bucket Golf spectator ticket
+    called out as SEPARATE from the player tickets.]
+
+6. Take off the "Next up" card and make so the "All current high bids" section
+   shows all items
+
+7. ok, the time on the "now closing" cards still doesn't update. I want that to be
+   moved out a minute when they bid and add a minute to the countdown. I dont want
+   it written back to the google sheet
+   [Clarifying answer: "Reset to 1:00 from each bid" (anti-snipe), not "add 60s on
+    top every bid".]
+
+8. The "Now Closing" cards flip back and forth depending on the time remaining. I
+   don't want that to happen.
+
+9. wrap the session and write a handoff

@@ -166,3 +166,95 @@ ADDENDUM 4 — stop the Now Closing cards flipping
   countdown shown but the card keeps its slot. SpotEntry gained `sortMs`.
 - +1 test (a wire bid changes effectiveCloseISO but not scheduledCloseISO). 63
   pass; build clean. Verified demo still yields two distinct batch cards.
+
+================================================================================
+SESSION 4 — FINAL HANDOFF (read this first)
+================================================================================
+Date: 2026-06-12
+Everything below is committed and pushed to origin/main (no PR opened).
+Latest main commit: "Stop the Now Closing cards from swapping when a bid
+extends a countdown" (0fe5da9).
+
+WHAT THIS SESSION DELIVERED (all on main)
+-----------------------------------------
+1. Ticket cascade rework (seats / outbid / tie-break):
+   - A group has a fixed SEAT count; it can take MORE bids than seats. Bids are
+     ranked highest-first, ties broken by LOWEST ticket number (raising a bid
+     never changes tie order). Top `seats` bids hold a seat and cascade-close;
+     lower bids are "outbid". A new high bid takes the top closing slot and the
+     displaced bid cascades down, dropping the lowest seat-holder to "outbid".
+   - Per-row close times act as a SCHEDULE of slots handed out by bid rank
+     (top bid -> earliest slot). Pure, stateless engine (lib/auction.ts).
+   - Seats is per-group, set on ONE row (Seats column). Unset = everyone wins.
+
+2. Dashboard: two "Now Closing" cards, one per BATCH (deduped by lane), so two
+   batches close in parallel but never two tickets from the same batch. "Next
+   Up" card REMOVED. "All Current High Bids" now shows everything (scrolls if
+   needed). Cards are ordered by SCHEDULED close, so a bid extends a card's
+   countdown WITHOUT making the cards swap places (scheduledCloseISO on
+   ComputedItem/ComputedTicket is the stable key).
+
+3. Bid extends the timer with NO sheet write-back: lib/bid-memory.ts is a
+   server-side, in-memory detector. app/api/state/route.ts stamps "now" as the
+   bid time when a Current Bid increases, feeding the existing anti-snipe so the
+   active card extends ~1 min. No dependency on the onEdit Apps Script or the
+   Last Bid Time column (both still honored if present). AUCTION_WRITEBACK can
+   stay OFF.
+   - Semantics (user-confirmed): close = bid time + 1 min, or scheduled if
+     later. So a bid only visibly moves the timer in its final minute.
+   - Caveat: memory is per-instance / non-durable; a redeploy or cold start
+     resets the baseline (and would drop an in-flight extension). Fine for a
+     one-day, single-endpoint event.
+
+KEY FILES
+---------
+  lib/auction.ts        Pure engine: anti-snipe, schedule-of-slots cascade,
+                        seats/outbid, scheduledCloseISO. All rules live here.
+  lib/auction.test.ts   63 tests incl. the exact Sales Office Lunch example.
+  lib/bid-memory.ts     Server-only in-memory "bid went up" detector (+tests).
+  app/api/state/route.ts  Wires bid-memory in; applies item cascade for display.
+  components/DashboardView.tsx  Two batch cards, stable scheduled-close order.
+  components/SpotlightCard.tsx  The card (SpotEntry has lane + sortMs).
+  components/BidList.tsx        "All Current High Bids" (shows all; outbid dimmed).
+  docs/SHEET_TEMPLATE.md        Seats column, batch behavior, extension note.
+  docs/sheet-template/Tickets.csv  Latest batch data; Spectator is its OWN Group.
+
+VERIFY
+------
+  npm install && npm test   -> 63 pass
+  npx tsc --noEmit          -> clean
+  npm run build             -> clean
+  Local preview: npm run dev -> http://localhost:3000 (demo data); /admin for the
+  test console (fast-forward the clock to a card's final minute, then +$, to see
+  the extension; engine is stateless so reload is safe).
+
+BRANCH CLEANUP (USER is handling)
+---------------------------------
+  - main has everything. The user is deleting the leftover branches themselves.
+  - GitHub won't delete the repo's DEFAULT branch, so the user must first set the
+    default to `main` (Settings -> Branches), THEN delete:
+    claude/adoring-planck-ltbhfw, claude/great-shannon-qz1snq,
+    claude/stoic-gates-8qe5ry, claude/epic-edison-4z5eme.
+  - NOTE: this environment's git proxy refused `git push --delete`, and the
+    GitHub MCP has no delete-branch tool, so branch deletion can't be done from a
+    session here — it's a GitHub-UI action.
+  - ROOT CAUSE of the whole "mess": multiple web sessions ran concurrently, each
+    branching off a stale base and rewriting lib/auction.ts. Run ONE session at a
+    time to avoid another pileup. (This session twice had to reconcile a parallel
+    push to main mid-flight, e.g. ac31413.)
+
+STILL OPEN / NEXT STEPS
+-----------------------
+  - docs/Silent-Auction-Import.xlsx NOT regenerated with the Seats column or the
+    latest data (the CSVs in docs/sheet-template/ are the source of truth and ARE
+    updated; the xlsx generator was never committed — reinstall `xlsx` --no-save
+    to rebuild if a single-file import is wanted).
+  - In the REAL Google Sheet: give the Wings spectator ticket its OWN Group name
+    so it's a separate batch; keep group spellings consistent (each distinct
+    spelling = a distinct batch). Set the Seats column (one row per group).
+  - Confirm timezone / event_date / final close times; wire Google creds; deploy
+    to Vercel (docs/SETUP_GUIDE.md). Until creds are set the dashboard shows demo.
+  - Optional: README still describes the onEdit Apps Script as a setup step; it's
+    now OPTIONAL (the in-memory detector covers the extension). Trim if desired.
+  - Phase-2 admin write-back to the sheet exists (token + AUCTION_WRITEBACK) but
+    the user wants NO write-back for the timer; leave AUCTION_WRITEBACK off.
