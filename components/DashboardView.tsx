@@ -107,7 +107,7 @@ export function DashboardView({
       )}
 
       {/* Two "Now Closing" cards — each a DIFFERENT batch (one ticket per group
-          at a time) — with "Next Up" (the next batch) spanning below. */}
+          at a time), so two batches can close in parallel. */}
       <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <SpotlightCard
           variant="now"
@@ -125,9 +125,6 @@ export function DashboardView({
           urgentSeconds={urgent}
           emptyLabel="Nothing else imminent"
         />
-        <div className="lg:col-span-2">
-          <SpotlightCard variant="next" entry={spotlights[2]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
-        </div>
       </div>
 
       <BidList items={state.items} groups={state.ticketGroups} tz={tz} />

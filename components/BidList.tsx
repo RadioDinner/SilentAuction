@@ -61,12 +61,12 @@ export function BidList({
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
+    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-3xl border border-white/10 bg-white/5 px-5 py-3">
       <h2 className="mb-2 shrink-0 text-xl font-extrabold uppercase tracking-[0.2em] text-slate-300">
         All Current High Bids
       </h2>
-      {/* Everything fits on the card — no scrolling. Columns fill top-down then
-          left-to-right. */}
+      {/* Every item and ticket is listed. Columns fill top-down then
+          left-to-right; the section scrolls if it can't all fit. */}
       <div className="columns-2 gap-x-8 lg:columns-3 xl:columns-4">
         {rows.map((r) => (
           <div

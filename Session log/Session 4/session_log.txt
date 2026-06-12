@@ -124,3 +124,11 @@ ADDENDUM — one-ticket-per-batch spotlights + spectator split
 - docs/SHEET_TEMPLATE.md: documented the two-cards-one-per-batch behavior, that a
   distinct Group = a distinct batch, and the per-row-times = schedule-of-slots.
 - Build clean, 58 tests pass (presentation change; engine untouched).
+
+ADDENDUM 2 — drop Next Up, high-bids shows all
+----------------------------------------------
+- DashboardView: removed the "Next Up" card; the two "Now Closing" batch cards
+  are the only spotlights now (spotlights[2] no longer rendered).
+- BidList: container overflow-hidden -> overflow-y-auto so the "All Current High
+  Bids" section shows every item + ticket (scrolls only if it can't all fit; the
+  freed space from removing Next Up means it usually fits without scrolling).
