@@ -60,13 +60,17 @@ How ranking and closing behave:
 | `Starting Bid`  | no       | `20`            | Informational. |
 | `Current Bid`   | yes      | `50`            | Staff update this. |
 | `High Bidder`   | no       | `Paddle 19`     | |
-| `Cascade Start` | no       | `7:00 PM`       | When the **highest** ticket in this group closes. Set it on **one row** of the group (usually the first). Falls back to `Config.ticket_cascade_start`. Note: giving *each* row a different time switches the group to per-ticket close times instead of the bid-ranked cascade. |
+| `Cascade Start` | no       | `7:00 PM`       | When the **highest** ticket in this group closes. Set it on **one row** of the group (usually the first), or put a time on every row to define the exact close **schedule** — the listed times become slots (soonest first) handed out by bid rank: top bid → earliest time, next bid → next time, etc. Falls back to `Config.ticket_cascade_start`. |
 | `Last Bid Time` | auto     | (ISO)           | Stamped by the Apps Script. |
 | `Notes`         | no       | `Lunch on Jul 23` | Free text for your records (not shown on the dashboard). |
 
-> **Multiple groups:** each group cascades independently. Give each its own
-> `Cascade Start` so they don't all close at once. The dashboard spotlights
-> whichever group is closing soonest and shows the rest as compact cards.
+> **Multiple groups / batches:** each group cascades independently and counts
+> as one **batch**. The dashboard's two "Now Closing" cards each show a
+> *different* batch's currently-closing ticket — so only one ticket per batch
+> closes at a time, but two batches can close in parallel — and "Next Up" shows
+> the next batch in line. Want something to close as its own batch (e.g. a
+> spectator ticket separate from the player tickets)? Give it its **own `Group`
+> name**.
 >
 > Any extra columns you add (e.g. `Winner Phone`, `Paid?`, `Picked Up?`) are
 > ignored by the dashboard, so the same sheet doubles as your checkout tracker.

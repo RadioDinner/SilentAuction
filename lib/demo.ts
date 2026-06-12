@@ -30,7 +30,8 @@ export function buildDemoData(nowMs: number): AuctionData {
   const tickets: TicketItem[] = [
     // Closes soonest -> this group is the spotlight on the dashboard.
     ...makeGroup("Dinner Tickets", { "1 of 4": 60, "2 of 4": 45, "3 of 4": 40, "4 of 4": 35 }, 45),
-    // 10 seats but 12 bids -> the two lowest bids ($20, $22) show as "outbid".
+    // Starts close to the Dinner group so BOTH batches are "Now Closing" at once
+    // (one card each). 10 seats but 12 bids -> the two lowest ($20, $22) "outbid".
     ...makeGroup(
       "Lunch Tickets",
       {
@@ -38,7 +39,7 @@ export function buildDemoData(nowMs: number): AuctionData {
         "5 of 12": 35, "6 of 12": 28, "7 of 12": 45, "8 of 12": 20,
         "9 of 12": 33, "10 of 12": 50, "11 of 12": 38, "12 of 12": 42,
       },
-      150,
+      60,
       10,
     ),
     ...makeGroup("Fishing Trip", { "1 of 3": 120, "2 of 3": 120, "3 of 3": 100 }, 300),

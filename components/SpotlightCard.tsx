@@ -4,6 +4,10 @@ import { formatClock, formatMoney } from "@/lib/format";
 /** A single thing on the closing timeline — an item or one ticket. */
 export interface SpotEntry {
   key: string;
+  /** Dedup lane: each spotlight card shows a different lane (one per ticket
+   *  group / one per item), so two tickets from the same batch never share the
+   *  two "Now Closing" cards. */
+  lane: string;
   kind: "item" | "ticket";
   name: string;
   /** Secondary line (item description, or ticket "#3 of 12"). */

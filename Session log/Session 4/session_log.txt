@@ -103,9 +103,24 @@ d. BRANCH CLEANUP STATE (what was done / left for the user)
 
 e. STILL OPEN (carried from earlier sessions)
 ---------------------------------------------
-  - Wings & Bucket Golf group has 6 numbered tickets + 1 "Spectator" row; left
-    Seats blank there (everyone wins) so the spectator isn't mis-ranked as outbid.
-    Confirm how the spectator should rank.
+  - [RESOLVED in the addendum below] The spectator is now its own batch/Group.
   - docs/Silent-Auction-Import.xlsx not regenerated with the Seats column (CSV is
     source of truth / updated).
   - Confirm timezone / event_date / exact close times; wire Google creds; deploy.
+
+ADDENDUM — one-ticket-per-batch spotlights + spectator split
+------------------------------------------------------------
+- DashboardView: the two "Now Closing" cards now show DIFFERENT batches. The
+  spotlight timeline is deduped by lane (one lane per ticket group, one per
+  item), so only one ticket per batch is "closing" at a time while two batches
+  can close in parallel; "Next Up" is the next distinct batch. (SpotEntry gained
+  a `lane` field.)
+- demo.ts: Lunch Tickets start moved 150s -> 60s so two batches are imminent at
+  once (verified: card1 = Dinner batch, card2 = Lunch batch, distinct lanes).
+- docs/sheet-template/Tickets.csv: refreshed to the user's latest data (new
+  bids/bidders, per-row close times 6:00..6:20 PM as a schedule). SPECTATOR split
+  into its own Group "Wings & Bucket Golf — Spectator" (seats 1) so it's a
+  separate batch from the 6 player tickets. Seats set per batch (12/4/3/2/6/1).
+- docs/SHEET_TEMPLATE.md: documented the two-cards-one-per-batch behavior, that a
+  distinct Group = a distinct batch, and the per-row-times = schedule-of-slots.
+- Build clean, 58 tests pass (presentation change; engine untouched).

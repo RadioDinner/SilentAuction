@@ -29,6 +29,7 @@ export function DashboardView({
     if (it.status === "closed") continue;
     open.push({
       key: `i-${it.id}`,
+      lane: `item:${it.id}`,
       kind: "item",
       name: it.name,
       sub: it.description,
@@ -44,6 +45,7 @@ export function DashboardView({
       if (t.status === "closed" || t.status === "outbid") continue;
       open.push({
         key: `t-${t.id}`,
+        lane: `group:${g.group}`,
         kind: "ticket",
         name: g.group,
         sub: `#${t.label}`,
@@ -60,6 +62,17 @@ export function DashboardView({
       a.closeISO.localeCompare(b.closeISO) ||
       a.name.localeCompare(b.name),
   );
+
+  // One spotlight per lane: keep only the soonest-closing entry from each ticket
+  // group (its active ticket) and each item. This is what lets two different
+  // BATCHES occupy the two "Now Closing" cards while never showing two tickets
+  // from the same batch — only one ticket per batch closes at a time.
+  const seenLanes = new Set<string>();
+  const spotlights = open.filter((e) => {
+    if (seenLanes.has(e.lane)) return false;
+    seenLanes.add(e.lane);
+    return true;
+  });
 
   return (
     <main className="flex h-full flex-col gap-4 p-4">
@@ -93,11 +106,12 @@ export function DashboardView({
         </div>
       )}
 
-      {/* Two "Now Closing" cards (the two soonest), with "Next Up" spanning below. */}
+      {/* Two "Now Closing" cards — each a DIFFERENT batch (one ticket per group
+          at a time) — with "Next Up" (the next batch) spanning below. */}
       <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <SpotlightCard
           variant="now"
-          entry={open[0]}
+          entry={spotlights[0]}
           nowMs={nowMs}
           tz={tz}
           urgentSeconds={urgent}
@@ -105,14 +119,14 @@ export function DashboardView({
         />
         <SpotlightCard
           variant="now"
-          entry={open[1]}
+          entry={spotlights[1]}
           nowMs={nowMs}
           tz={tz}
           urgentSeconds={urgent}
           emptyLabel="Nothing else imminent"
         />
         <div className="lg:col-span-2">
-          <SpotlightCard variant="next" entry={open[2]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
+          <SpotlightCard variant="next" entry={spotlights[2]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
         </div>
       </div>
 
