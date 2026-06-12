@@ -23,9 +23,11 @@ seconds.
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Featured item** — big photo, live countdown, current high bid + bidder.
+- **Two "Now Closing" spotlights** — the two soonest-closing lots, big photo and
+  live countdown, with a **"Next Up"** card below.
 - **Ticket cascade** — a group of identical tickets that close one at a time,
   highest bid first.
+- **Winner reveal** — once a lot closes, its row shows 🏆 the winning bidder.
 - **All current high bids** — a compact board of every item and ticket.
 
 No app login to build, no database to run: the Google Sheet *is* the admin
@@ -38,7 +40,7 @@ interface, and the auction rules are computed fresh on every refresh.
 All timing is computed server-side from the raw sheet data, so there's no hidden
 state — reload at any moment and you get the correct picture.
 
-### Regular items — anti-snipe
+### Regular items — anti-snipe + stagger
 Each item has a scheduled **Close Time**. Any bid pushes the close out to
 `bid time + extension window` (default **1 minute**) — but only when that's
 *later* than the scheduled close. So:
@@ -47,6 +49,13 @@ Each item has a scheduled **Close Time**. Any bid pushes the close out to
 > someone bids **$1,600**; staff type it into the sheet. The close jumps to
 > **5:31**, high bid **$1,600**. A bid placed earlier (say 5:24) doesn't move
 > anything.
+
+When such a wire bid **extends** an item, every item that closes *later* than it
+is nudged out by one window too, so a late flurry doesn't bunch everything onto
+the same instant. With **`AUCTION_WRITEBACK=1`** the new close times are written
+straight back into the sheet (so the stagger compounds with each bid and the
+sheet stays the source of truth); without it the same stagger is still shown on
+the dashboard, just not persisted.
 
 ### Tickets — sequential cascade
 Within a group, tickets close **one at a time, highest bid first**. Only the top
@@ -199,6 +208,7 @@ correct even if the TV's clock is off.
 | Poll interval (seconds) | `NEXT_PUBLIC_POLL_SECONDS` env | `3` |
 | Force demo data | `AUCTION_DEMO=1` env, or `?demo=1` on the URL | off |
 | Live "Save to Sheet" | `ADMIN_TOKEN` env + service-account Editor access | off (read-only) |
+| Auto write-back of extended close times | `AUCTION_WRITEBACK=1` env + service-account Editor access | off (compute-only) |
 | Tab names | `SHEET_ITEMS_TAB` / `SHEET_TICKETS_TAB` / `SHEET_CONFIG_TAB` env | `Items` / `Tickets` / `Config` |
 
 ---

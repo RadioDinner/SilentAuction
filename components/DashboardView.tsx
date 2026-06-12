@@ -92,9 +92,27 @@ export function DashboardView({
         </div>
       )}
 
+      {/* Two "Now Closing" cards (the two soonest), with "Next Up" spanning below. */}
       <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
-        <SpotlightCard variant="now" entry={open[0]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
-        <SpotlightCard variant="next" entry={open[1]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
+        <SpotlightCard
+          variant="now"
+          entry={open[0]}
+          nowMs={nowMs}
+          tz={tz}
+          urgentSeconds={urgent}
+          emptyLabel="Auction complete"
+        />
+        <SpotlightCard
+          variant="now"
+          entry={open[1]}
+          nowMs={nowMs}
+          tz={tz}
+          urgentSeconds={urgent}
+          emptyLabel="Nothing else imminent"
+        />
+        <div className="lg:col-span-2">
+          <SpotlightCard variant="next" entry={open[2]} nowMs={nowMs} tz={tz} urgentSeconds={urgent} />
+        </div>
       </div>
 
       <BidList items={state.items} groups={state.ticketGroups} tz={tz} />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { computeState } from "@/lib/auction";
+import { cascadeItemCloses, computeState, normalizeConfig } from "@/lib/auction";
 import { DashboardView } from "@/components/DashboardView";
 import type { AuctionData, AuctionState } from "@/lib/types";
 
@@ -118,10 +118,12 @@ export default function AdminConsole() {
   }, []);
 
   const previewNow = nowMs + offsetRef.current + shiftMs;
-  const preview = useMemo(
-    () => (data ? computeState(data, previewNow, srcRef.current) : null),
-    [data, previewNow],
-  );
+  const preview = useMemo(() => {
+    if (!data) return null;
+    const cfg = normalizeConfig(data.config);
+    const cascaded = { ...data, items: cascadeItemCloses(data.items, cfg, previewNow) };
+    return computeState(cascaded, previewNow, srcRef.current);
+  }, [data, previewNow]);
 
   function reloadFromSource(clearLocal: boolean) {
     if (clearLocal) window.localStorage.removeItem(STORAGE_KEY);

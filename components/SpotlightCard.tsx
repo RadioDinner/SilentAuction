@@ -37,12 +37,15 @@ export function SpotlightCard({
   nowMs,
   tz,
   urgentSeconds,
+  emptyLabel,
 }: {
   variant: "now" | "next";
   entry?: SpotEntry;
   nowMs: number;
   tz: string;
   urgentSeconds: number;
+  /** Override the placeholder text shown when there's no entry. */
+  emptyLabel?: string;
 }) {
   const v = VARIANTS[variant];
 
@@ -53,7 +56,7 @@ export function SpotlightCard({
       >
         <div className="text-center">
           <div className={`text-sm font-bold uppercase tracking-[0.3em] ${v.accent}`}>{v.label}</div>
-          <div className="mt-2 text-3xl text-slate-400">{v.empty}</div>
+          <div className="mt-2 text-3xl text-slate-400">{emptyLabel ?? v.empty}</div>
         </div>
       </section>
     );

@@ -96,6 +96,110 @@ export function computeItem(
 }
 
 // ---------------------------------------------------------------------------
+// Item closing cascade (anti-snipe persistence + stagger)
+//
+// Regular items each have their own scheduled close. Two coupled rules keep a
+// late-bidding flurry from bunching every item onto the same instant:
+//
+//   1. ANTI-SNIPE: a bid near an item's close pushes that item out to
+//      (lastBid + window) — same rule computeItem already shows live.
+//   2. STAGGER: when such a bid actually EXTENDS an item, every item that
+//      closes LATER than it is pushed out by one window too (+1 min default).
+//
+// Both are expressed as ABSOLUTE new close times (seconds), computed purely
+// from the current sheet state, so:
+//   * the result is idempotent — once written back, no item is still "fresh",
+//     so re-running yields no further change; and
+//   * concurrent writers converge — they compute the same absolute value rather
+//     than each adding a delta.
+//
+// The stagger only accumulates "per bid" when the new closes are PERSISTED back
+// to the sheet (the live route does this): writing clears an item's freshness,
+// so the next bid is counted afresh. Without persistence it still renders a
+// stable stagger; it just won't compound across repeat bids on the same item.
+// ---------------------------------------------------------------------------
+
+/** A persisted close-time change for one item. */
+export interface ItemCloseChange {
+  id: string;
+  newCloseISO: string;
+}
+
+/** Only items closing within this horizon take part — keeps the synthetic
+ *  "far future" close of an item with no time set out of the cascade (and out
+ *  of the write-back, which would otherwise churn on its moving value). */
+const CASCADE_HORIZON_MS = 12 * 3600 * 1000;
+
+/**
+ * Core: the cascaded close time (epoch SECONDS) for each item, or null for
+ * items with no real near-term close (left untouched). Pure.
+ */
+function cascadedCloseSeconds(
+  items: RegularItem[],
+  config: AuctionConfig,
+  nowMs: number,
+): (number | null)[] {
+  const windowSec = Math.max(1, Math.round(config.extensionWindowSeconds || 60));
+
+  const baseSec = items.map((it) => {
+    const ms = toMs(it.baseCloseISO);
+    if (ms == null || ms > nowMs + CASCADE_HORIZON_MS) return null;
+    return Math.floor(ms / 1000);
+  });
+  const bidSec = items.map((it) => {
+    const ms = toMs(it.lastBidISO);
+    return ms == null ? null : Math.floor(ms / 1000);
+  });
+  // "Fresh" = a bid that pushes this item's close past where it stands now.
+  const fresh = items.map(
+    (_, i) => baseSec[i] != null && bidSec[i] != null && bidSec[i]! + windowSec > baseSec[i]!,
+  );
+
+  return items.map((_, i) => {
+    const b = baseSec[i];
+    if (b == null) return null;
+    const antiSnipe = fresh[i] ? bidSec[i]! + windowSec : b;
+    let bumps = 0;
+    for (let x = 0; x < items.length; x++) {
+      if (x !== i && fresh[x] && baseSec[x] != null && baseSec[x]! < b) bumps++;
+    }
+    return antiSnipe + bumps * windowSec;
+  });
+}
+
+/** Items with their `baseCloseISO` advanced to the cascaded close (for display). */
+export function cascadeItemCloses(
+  items: RegularItem[],
+  config: AuctionConfig,
+  nowMs: number,
+): RegularItem[] {
+  const sec = cascadedCloseSeconds(items, config, nowMs);
+  return items.map((it, i) =>
+    sec[i] == null ? it : { ...it, baseCloseISO: new Date(sec[i]! * 1000).toISOString() },
+  );
+}
+
+/** The minimal set of close-time changes to write back to the sheet. */
+export function planItemCascadeWriteback(
+  items: RegularItem[],
+  config: AuctionConfig,
+  nowMs: number,
+): ItemCloseChange[] {
+  const sec = cascadedCloseSeconds(items, config, nowMs);
+  const changes: ItemCloseChange[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const next = sec[i];
+    if (next == null) continue;
+    const ms = toMs(items[i].baseCloseISO);
+    const orig = ms == null ? null : Math.floor(ms / 1000);
+    if (orig != null && next !== orig) {
+      changes.push({ id: items[i].id, newCloseISO: new Date(next * 1000).toISOString() });
+    }
+  }
+  return changes;
+}
+
+// ---------------------------------------------------------------------------
 // Ticket cascade
 //
 // Within a group, tickets close one at a time, highest bid first. Only the
