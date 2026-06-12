@@ -213,37 +213,12 @@ export function planItemCascadeWriteback(
 // remaining tickets by 1 minute" rule the event needs.
 // ---------------------------------------------------------------------------
 
-/** Sort comparator: highest bid first, then earliest bid, then natural label. */
+/** Closing order within a group: highest bid closes first; ties are broken by
+ *  the LOWEST ticket number (so $50 "2 of 12" closes before $50 "5 of 12"). */
 function compareTickets(a: TicketItem, b: TicketItem): number {
   const bidDiff = (b.currentBid ?? 0) - (a.currentBid ?? 0);
   if (bidDiff !== 0) return bidDiff;
-  const aBid = toMs(a.lastBidISO) ?? Number.POSITIVE_INFINITY;
-  const bBid = toMs(b.lastBidISO) ?? Number.POSITIVE_INFINITY;
-  if (aBid !== bBid) return aBid - bBid;
   return a.label.localeCompare(b.label, undefined, { numeric: true });
-}
-
-/** Sort comparator for explicit per-ticket close times: soonest first; tickets
- *  without a time trail the rest, ordered by natural label. */
-function compareTicketTimes(a: TicketItem, b: TicketItem): number {
-  const am = toMs(a.cascadeStartISO);
-  const bm = toMs(b.cascadeStartISO);
-  if (am != null && bm != null && am !== bm) return am - bm;
-  if (am != null && bm == null) return -1;
-  if (am == null && bm != null) return 1;
-  return a.label.localeCompare(b.label, undefined, { numeric: true });
-}
-
-/** Count of DISTINCT cascade-start times across a group. When 2+ tickets carry
- *  different times, the sheet is giving each ticket its own close time (rather
- *  than one shared start for the whole group). */
-function distinctStartCount(tickets: TicketItem[]): number {
-  const set = new Set<number>();
-  for (const t of tickets) {
-    const ms = toMs(t.cascadeStartISO);
-    if (ms != null) set.add(ms);
-  }
-  return set.size;
 }
 
 export function ticketId(t: Pick<TicketItem, "group" | "label">): string {
@@ -259,35 +234,37 @@ export function computeTicketGroup(
   const windowMs = config.extensionWindowSeconds * 1000;
   const countdownMs = config.ticketCountdownSeconds * 1000;
 
-  let sorted: TicketItem[];
+  // Closing order: highest bid closes first, ties by lowest ticket number.
+  const sorted = [...groupTickets].sort(compareTickets);
+
+  // The group's listed close times form a SCHEDULE of slots (soonest first).
+  // Tickets are assigned to slots by bid rank — the top bid takes the earliest
+  // slot, the next bid the next slot, and so on — so the time a row happens to
+  // list isn't tied to that row, it just contributes a slot. Distinct times
+  // only: one time shared across every row means "the group starts here" (a
+  // single anchor), not a stack of identical slots. Past the listed slots we
+  // fall back to a fixed `ticket_countdown_seconds` gap between tickets.
+  const slotTimes = Array.from(
+    new Set(
+      groupTickets.map((t) => toMs(t.cascadeStartISO)).filter((n): n is number => n != null),
+    ),
+  ).sort((a, b) => a - b);
+
+  const anchorMs = slotTimes[0] ?? toMs(config.ticketCascadeStartISO) ?? nowMs + countdownMs;
+
   const closeMs: number[] = [];
-
-  if (distinctStartCount(groupTickets) >= 2) {
-    // PER-TICKET MODE: the sheet gives each ticket its own close time. Honor it
-    // exactly (with anti-snipe per ticket); order by that time. Any ticket
-    // missing a time trails the previous one by one countdown.
-    sorted = [...groupTickets].sort(compareTicketTimes);
-    for (let i = 0; i < sorted.length; i++) {
-      const own = toMs(sorted[i].cascadeStartISO);
-      const baseMs = own ?? (i === 0 ? nowMs + countdownMs : closeMs[i - 1] + countdownMs);
-      closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
+  for (let i = 0; i < sorted.length; i++) {
+    let baseMs: number;
+    if (i === 0) {
+      baseMs = anchorMs;
+    } else {
+      // Spacing comes from the schedule while slots last, else the fixed
+      // countdown. Deriving each close from the PREVIOUS one is what makes a
+      // bid that extends the active ticket push ALL remaining tickets out too.
+      const gap = i < slotTimes.length ? Math.max(0, slotTimes[i] - slotTimes[i - 1]) : countdownMs;
+      baseMs = closeMs[i - 1] + gap;
     }
-  } else {
-    // CASCADE MODE: one start time for the whole group (set on any row, else the
-    // global config value), highest bid closes first, each subsequent ticket
-    // closes `countdown` after the previous — so a late bid on the active ticket
-    // pushes all remaining tickets out together. If no start is set, give the
-    // first ticket a full countdown from "now" rather than closing instantly.
-    const groupStartISO =
-      groupTickets.find((t) => t.cascadeStartISO)?.cascadeStartISO ??
-      config.ticketCascadeStartISO;
-    const cascadeStartMs = toMs(groupStartISO) ?? nowMs + countdownMs;
-
-    sorted = [...groupTickets].sort(compareTickets);
-    for (let i = 0; i < sorted.length; i++) {
-      const baseMs = i === 0 ? cascadeStartMs : closeMs[i - 1] + countdownMs;
-      closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
-    }
+    closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
   }
 
   // The active ticket is the first one not yet closed.
