@@ -132,3 +132,26 @@ ADDENDUM 2 — drop Next Up, high-bids shows all
 - BidList: container overflow-hidden -> overflow-y-auto so the "All Current High
   Bids" section shows every item + ticket (scrolls only if it can't all fit; the
   freed space from removing Next Up means it usually fits without scrolling).
+
+ADDENDUM 3 — bid extends the Now Closing timer, no write-back
+------------------------------------------------------------
+- User wants a bid to push the active card out ~1 min (chose "reset to 1:00 from
+  each bid"), with NOTHING written to the Google Sheet.
+- Root cause it "didn't update": the display-only anti-snipe (close = max(
+  scheduled, lastBid + window)) was already correct, but it needs a bid TIME.
+  The user edits Current Bid directly and most "Last Bid Time" cells are blank,
+  so the engine had no timestamp -> no extension.
+- Fix (no sheet writes): lib/bid-memory.ts — a server-side, in-memory detector.
+  app/api/state/route.ts calls observeBid() per row (sheet path); when a
+  Current Bid goes UP it stamps "now" as the bid time (sticky until the next
+  increase), feeding the existing anti-snipe. So a bid now extends the active
+  card to 1 min with no write-back and no dependency on Last Bid Time / the
+  onEdit Apps Script. Last Bid Time is still honored if present (max of the two).
+  +4 unit tests (lib/bid-memory.test.ts). 62 tests pass; build clean.
+- INHERENT (explained to user): because close = "bid time + 1 min, or scheduled
+  if later", a bid only visibly moves the timer in the final minute; earlier bids
+  leave the scheduled time in place. To see it while testing, fast-forward the
+  admin clock to the final minute before bidding.
+- CAVEAT (documented): the memory is per server instance and non-durable; a
+  redeploy/cold start resets the baseline (and would drop an in-flight
+  extension). Fine for a one-day single-endpoint event.

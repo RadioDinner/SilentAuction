@@ -2,11 +2,35 @@ import type { NextRequest } from "next/server";
 import { cascadeItemCloses, computeState, normalizeConfig, planItemCascadeWriteback } from "@/lib/auction";
 import { buildDemoData } from "@/lib/demo";
 import { applyAuctionWrites, getAuctionDataFromSheet, hasSheetCredentials } from "@/lib/sheets";
-import type { AuctionState } from "@/lib/types";
+import { observeBid } from "@/lib/bid-memory";
+import type { AuctionData, AuctionState } from "@/lib/types";
 
 // Always computed fresh per request; never cached at the edge.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** Later of an existing ISO time and an epoch-ms candidate, as ISO. */
+function laterISO(iso: string | undefined, ms: number): string {
+  const cur = iso ? Date.parse(iso) : NaN;
+  return new Date(Number.isNaN(cur) ? ms : Math.max(cur, ms)).toISOString();
+}
+
+/**
+ * Drive the anti-snipe extension from a bid going UP, even when the sheet's
+ * "Last Bid Time" is blank — without writing anything back to the sheet. The
+ * server remembers each row's last bid in memory; when it increases we stamp
+ * "now" as the bid time so the active card extends to a full minute.
+ */
+function applyObservedBids(data: AuctionData, nowMs: number): void {
+  for (const it of data.items) {
+    const at = observeBid(`item:${it.id}`, it.currentBid, nowMs);
+    if (at != null) it.lastBidISO = laterISO(it.lastBidISO, at);
+  }
+  for (const t of data.tickets) {
+    const at = observeBid(`ticket:${t.group}::${t.label}`, t.currentBid, nowMs);
+    if (at != null) t.lastBidISO = laterISO(t.lastBidISO, at);
+  }
+}
 
 export async function GET(req: NextRequest) {
   const now = Date.now();
@@ -41,6 +65,10 @@ export async function GET(req: NextRequest) {
       }
 
       const cfg = normalizeConfig(data.config);
+
+      // A bid that only changes Current Bid (no Last Bid Time) still triggers
+      // the display-only anti-snipe extension — without writing to the sheet.
+      applyObservedBids(data, now);
 
       // Anti-snipe + stagger: persist the new close times back to the sheet
       // (opt-in) so the cascade compounds per bid and the sheet stays the truth.

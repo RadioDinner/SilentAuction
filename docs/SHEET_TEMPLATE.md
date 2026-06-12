@@ -61,8 +61,19 @@ How ranking and closing behave:
 | `Current Bid`   | yes      | `50`            | Staff update this. |
 | `High Bidder`   | no       | `Paddle 19`     | |
 | `Cascade Start` | no       | `7:00 PM`       | When the **highest** ticket in this group closes. Set it on **one row** of the group (usually the first), or put a time on every row to define the exact close **schedule** — the listed times become slots (soonest first) handed out by bid rank: top bid → earliest time, next bid → next time, etc. Falls back to `Config.ticket_cascade_start`. |
-| `Last Bid Time` | auto     | (ISO)           | Stamped by the Apps Script. |
+| `Last Bid Time` | optional | (ISO)           | If present, used as the bid time for the 1-minute extension. You don't have to fill it: the dashboard also detects a `Current Bid` going up on its own (see below). |
 | `Notes`         | no       | `Lunch on Jul 23` | Free text for your records (not shown on the dashboard). |
+
+> **How the timer extends on a bid (no write-back):** when you raise a
+> `Current Bid`, the active "Now Closing" card pushes its close out to **one
+> minute from that bid** (or the scheduled time, whichever is later). This is
+> computed live — *nothing is written back to your sheet*. The dashboard notices
+> the bid going up by itself, so the `Last Bid Time` column and the onEdit Apps
+> Script are now **optional** (fill `Last Bid Time` only if you want the exact
+> bid time used instead of "when the dashboard first saw it"). Note: because the
+> close is "bid time + 1 min, or scheduled if later", a bid placed while the card
+> still has several minutes left won't visibly move it — the bump shows in the
+> final minute, which is when it matters.
 
 > **Multiple groups / batches:** each group cascades independently and counts
 > as one **batch**. The dashboard's two "Now Closing" cards each show a
