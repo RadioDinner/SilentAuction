@@ -175,6 +175,9 @@ function parseTickets(rows: Row[], eventDateISO: string | undefined, tz: string)
         eventDateISO,
         tz,
       ),
+      seats: money(
+        pick(row, hi, ["seats", "seatcount", "available", "quantity", "qty", "numtickets", "totalseats", "totaltickets"]),
+      ),
     });
   }
   return tickets;

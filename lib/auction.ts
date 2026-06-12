@@ -202,15 +202,23 @@ export function planItemCascadeWriteback(
 // ---------------------------------------------------------------------------
 // Ticket cascade
 //
-// Within a group, tickets close one at a time, highest bid first. Only the
-// first still-open ticket is "active" (counting down); the rest are "pending"
-// (up next). The first ticket's close is the configured cascade start; each
-// subsequent ticket closes `ticketCountdownSeconds` after the previous one.
+// A group has a fixed number of SEATS (e.g. 12) but may take MORE bids than
+// seats. All bids are ranked highest-first (ties by lowest ticket number); the
+// top `seats` bids hold a seat, any lower bids are "outbid" (they've lost their
+// seat — for now). Seats close one at a time, highest first: only the first
+// still-open seat is "active" (counting down), the rest are "pending". The first
+// seat closes at the group's anchor time; each subsequent seat closes one slot
+// later (see the schedule below).
 //
-// Because every later close is derived from the previous close, pushing the
-// active ticket's close out by anti-snipe automatically pushes ALL remaining
-// tickets out by the same amount — which is exactly the "a bid extends all
-// remaining tickets by 1 minute" rule the event needs.
+// Two rules fall straight out of re-ranking on every poll, with no stored state:
+//
+//   * "A bid extends all remaining tickets by 1 minute" — because every later
+//     close derives from the previous one, anti-snipe on the active seat shifts
+//     ALL remaining seats out by the same amount.
+//   * "A new high bid takes the top and the old bid cascades down the chain" —
+//     a higher bid re-sorts to the top (the new active/closing seat); the bid it
+//     displaced slides down to fight for the next seat, shoving each lower bid
+//     down one, and the lowest seat-holder drops to "outbid".
 // ---------------------------------------------------------------------------
 
 /** Closing order within a group: highest bid closes first; ties are broken by
@@ -234,8 +242,17 @@ export function computeTicketGroup(
   const windowMs = config.extensionWindowSeconds * 1000;
   const countdownMs = config.ticketCountdownSeconds * 1000;
 
-  // Closing order: highest bid closes first, ties by lowest ticket number.
+  // Closing order: highest bid closes first, ties by lowest ticket number. A new
+  // high bid sorts to the top here, pushing the bid it beat down the chain.
   const sorted = [...groupTickets].sort(compareTickets);
+
+  // Seats available (set on any one row of the group). Only the top `seats` bids
+  // hold a seat and close; bids ranked beyond them are "outbid". Unset => every
+  // bid wins a seat (no one is outbid).
+  const configuredSeats = groupTickets.find(
+    (t) => t.seats != null && t.seats > 0,
+  )?.seats;
+  const winnerCount = Math.min(configuredSeats ?? sorted.length, sorted.length);
 
   // The group's listed close times form a SCHEDULE of slots (soonest first).
   // Tickets are assigned to slots by bid rank — the top bid takes the earliest
@@ -252,8 +269,9 @@ export function computeTicketGroup(
 
   const anchorMs = slotTimes[0] ?? toMs(config.ticketCascadeStartISO) ?? nowMs + countdownMs;
 
+  // Close times only for the WINNING seats; outbid bids have no countdown.
   const closeMs: number[] = [];
-  for (let i = 0; i < sorted.length; i++) {
+  for (let i = 0; i < winnerCount; i++) {
     let baseMs: number;
     if (i === 0) {
       baseMs = anchorMs;
@@ -267,18 +285,23 @@ export function computeTicketGroup(
     closeMs[i] = effectiveCloseMs(baseMs, toMs(sorted[i].lastBidISO), windowMs);
   }
 
-  // The active ticket is the first one not yet closed.
+  // The active seat is the first winner not yet closed.
   let activeIndex = -1;
-  for (let i = 0; i < sorted.length; i++) {
+  for (let i = 0; i < winnerCount; i++) {
     if (nowMs < closeMs[i]) {
       activeIndex = i;
       break;
     }
   }
 
+  // Placeholder close for outbid bids (they never count down; UI keys off status).
+  const outbidCloseISO = new Date(anchorMs).toISOString();
+
   const tickets: ComputedTicket[] = sorted.map((t, i) => {
+    const winner = i < winnerCount;
     let status: ComputedTicket["status"];
-    if (nowMs >= closeMs[i]) status = "closed";
+    if (!winner) status = "outbid";
+    else if (nowMs >= closeMs[i]) status = "closed";
     else if (i === activeIndex) status = "active";
     else status = "pending";
 
@@ -287,8 +310,8 @@ export function computeTicketGroup(
       id: ticketId(t),
       rank: i,
       status,
-      effectiveCloseISO: new Date(closeMs[i]).toISOString(),
-      secondsLeft: secondsLeft(closeMs[i], nowMs),
+      effectiveCloseISO: winner ? new Date(closeMs[i]).toISOString() : outbidCloseISO,
+      secondsLeft: winner ? secondsLeft(closeMs[i], nowMs) : 0,
     };
   });
 
@@ -296,8 +319,12 @@ export function computeTicketGroup(
     group,
     imageUrl: tickets.find((t) => t.imageUrl)?.imageUrl,
     tickets,
+    seats: configuredSeats ?? sorted.length,
     activeTicketId: activeIndex >= 0 ? tickets[activeIndex].id : undefined,
-    openCount: tickets.filter((t) => t.status !== "closed").length,
+    openCount: tickets.filter(
+      (t) => t.status === "active" || t.status === "pending",
+    ).length,
+    outbidCount: tickets.filter((t) => t.status === "outbid").length,
   };
 }
 

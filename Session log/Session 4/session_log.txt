@@ -1,0 +1,111 @@
+SESSION 4 — HANDOFF LOG
+=======================
+Date: 2026-06-12
+Project: Silent Auction Dashboard (company picnic)
+Two things this session: (1) reworked the ticket cascade; (2) consolidated a
+mess of parallel branches down to `main`.
+
+
+a. THE BRANCH MESS (and how it was resolved)
+--------------------------------------------
+Parallel web sessions had each branched off a stale base, leaving:
+  - main (ee2bfd5)        the furthest-along trunk: already contained
+                          adoring-planck + great-shannon, PLUS a dashboard
+                          redesign (SpotlightCard, two "Now Closing" + "Next Up"),
+                          an ITEM closing cascade, per-ticket close times, Sheet
+                          write-back, and winner reveal.
+  - claude/adoring-planck-ltbhfw (243036e)  OLD default; fully contained in main.
+  - claude/great-shannon-qz1snq (f7c2dad)   fully contained in main.
+  - claude/epic-edison-4z5eme (44d202a)     1 unique commit: a PARALLEL, never-
+                          merged Sheet write-back (lib/sheet-write.ts etc.) on the
+                          old base. main already has write-back a different way.
+                          -> user chose to DROP it (delete, don't merge).
+  - claude/stoic-gates-8qe5ry (766abfc)     THIS session's ticket-cascade rework,
+                          built on the OLD base (before main's redesign).
+
+Because main had DELETED the components stoic-gates edited (TicketPanel,
+TicketGroupSummary, FeaturedItem -> replaced by SpotlightCard) and rewritten
+auction.ts/sheets.ts/admin, a git merge would have been a conflict disaster.
+So the cascade work was RE-APPLIED onto main by hand instead of merged. The
+stoic-gates commit is preserved in history; its logic now lives on main.
+
+MID-FLIGHT: while this was in progress, YET ANOTHER parallel session pushed
+`ac31413 Fix ticket cascade: bid-ordered closing with per-row times as a shared
+schedule` onto origin/main. It independently (a) dropped the bid-time tiebreak in
+favor of LOWEST ticket number — same change Session 4 made — and (b) replaced the
+old two-mode computeTicketGroup with a single bid-ordered cascade that pools each
+row's listed time into a SCHEDULE of slots (top bid -> earliest slot). It did NOT
+have the seats/outbid feature. Resolution: kept ac31413 as the base (its engine is
+better) and layered seats/outbid on top of it, rather than the old two-mode
+version. compareTickets was already identical on both sides. ac31413's tests
+(incl. the exact Sales Office Lunch example) were kept; only the 3 seats/outbid
+tests were added.
+
+
+b. THE CASCADE REWORK (re-applied onto main)
+--------------------------------------------
+Clarified rules (user Q&A):
+  1. MORE BIDS THAN SEATS. A group has a fixed seat count (e.g. 12) but can take
+     more bids than seats. Bids ranked highest-first; top `seats` hold a seat and
+     cascade-close, lower bids are "outbid". Default seats = #bids, so a group
+     with no Seats set behaves exactly as before (everyone wins).
+  2. NEW HIGH BID TAKES TOP, OLD CASCADES DOWN. A higher bid re-sorts to the top
+     (active/closing seat); the bid it beat slides down to fight for the next
+     seat, shoving each lower bid down one; the lowest seat-holder drops to
+     "outbid". Pure re-rank every poll — no stored state.
+  TIE-BREAK: ties now break by TICKET NUMBER (label), not bid time, so raising a
+     bid never changes tie-break priority. Reproduces the brief's Sales Office
+     Lunch order: $70->1; $50->2,5; $40->10; $30->3,11,12; $20->4,6,7,8,9.
+
+  Integration note: main's computeTicketGroup has TWO modes. Seats/outbid apply
+  in CASCADE mode (one shared start, bid-ranked). PER-TICKET mode (each row has
+  its own distinct close time) is untouched — every ticket keeps its seat there.
+
+Files changed on main:
+  lib/types.ts       TicketStatus += "outbid"; TicketItem.seats?;
+                     TicketGroupState += seats, outbidCount.
+  lib/auction.ts     computeTicketGroup -> seats split + outbid + cascade over
+                     the winning seats, layered on ac31413's schedule-of-slots
+                     engine. (tie-by-label tiebreak already present from ac31413.)
+  lib/sheets.ts      parseTickets parses a "Seats" column.
+  lib/demo.ts        Lunch Tickets now 10 seats / 12 bids -> 2 outbid out of box.
+  components/DashboardView.tsx  closing timeline skips outbid (not just closed).
+  components/BidList.tsx        outbid rows dimmed, secondary label "outbid".
+  app/admin/page.tsx           seats carried in stateToData; per-group Seats
+                               input + "+ Add bid" button to test oversubscription.
+  lib/auction.test.ts          +3 seats/outbid tests (tie-break + the exact Sales
+                               Office Lunch example already covered by ac31413).
+  docs/SHEET_TEMPLATE.md       Seats column + ranking/cascade/tie-break rules.
+  docs/sheet-template/Tickets.csv  Seats column; David Lee (5 of 12) -> $50 to
+                               match the user's real example.
+
+
+c. VERIFICATION
+---------------
+  - npm test -> 58/58 pass.  npx tsc --noEmit -> clean.  npm run build -> clean.
+  - Demo API on main: Lunch Tickets seats:10 open:10 outbid:2; highest active;
+    ties by ticket number; the two lowest ($22,$20) "outbid". End-to-end good.
+
+
+d. BRANCH CLEANUP STATE (what was done / left for the user)
+----------------------------------------------------------
+  - All cascade work committed to `main` and pushed.
+  - DELETED remote branches (all contained in main or dropped per user):
+      claude/great-shannon-qz1snq, claude/epic-edison-4z5eme,
+      claude/stoic-gates-8qe5ry.
+  - claude/adoring-planck-ltbhfw could NOT be deleted yet: GitHub refuses to
+    delete the repo's DEFAULT branch. It is fully contained in main, so it's safe
+    to delete once it's no longer default.
+  - ACTION FOR USER: in GitHub repo Settings -> Branches, set the default branch
+    to `main`. Then delete claude/adoring-planck-ltbhfw (GitHub UI, or ask next
+    session). After that, only `main` remains.
+
+
+e. STILL OPEN (carried from earlier sessions)
+---------------------------------------------
+  - Wings & Bucket Golf group has 6 numbered tickets + 1 "Spectator" row; left
+    Seats blank there (everyone wins) so the spectator isn't mis-ranked as outbid.
+    Confirm how the spectator should rank.
+  - docs/Silent-Auction-Import.xlsx not regenerated with the Seats column (CSV is
+    source of truth / updated).
+  - Confirm timezone / event_date / exact close times; wire Google creds; deploy.

@@ -1,0 +1,34 @@
+SESSION 4 — PROMPT HISTORY (verbatim)
+=====================================
+
+1. Ok, my sessions keep crashing. I want to start Session 4
+
+The cascade system isn't working as I expected. It's going to get a bit complicated too, here is my data on an example.
+
+Sales Office Lunch	1 of 12		70	Matt Hershberger	Friday, June 12, 2026 at 10:25:00 AM		Lunch on Jul 23
+Sales Office Lunch	2 of 12		50	Ken Miller	Friday, June 12, 2026 at 10:26:00 AM		Lunch on Jul 23
+Sales Office Lunch	3 of 12		30	Chad Gerber	Friday, June 12, 2026 at 10:27:00 AM		Lunch on Jul 23
+Sales Office Lunch	4 of 12		20	Grant Gingerich	Friday, June 12, 2026 at 10:28:00 AM		Lunch on Jul 23
+Sales Office Lunch	5 of 12		50	David Lee	Friday, June 12, 2026 at 10:29:00 AM		Lunch on Jul 23
+Sales Office Lunch	6 of 12		20	Ivan Yoder	Friday, June 12, 2026 at 10:30:00 AM		Lunch on Jul 23
+Sales Office Lunch	7 of 12		20	Jacob Miller	Friday, June 12, 2026 at 10:31:00 AM		Lunch on Jul 23
+Sales Office Lunch	8 of 12		20	Jacob Miller	Friday, June 12, 2026 at 10:32:00 AM		Lunch on Jul 23
+Sales Office Lunch	9 of 12		20	Jared Hanni	Friday, June 12, 2026 at 10:33:00 AM		Lunch on Jul 23
+Sales Office Lunch	10 of 12		40	Myron Yoder	Friday, June 12, 2026 at 10:34:00 AM		Lunch on Jul 23
+Sales Office Lunch	11 of 12		30	John Yoder	Friday, June 12, 2026 at 10:35:00 AM		Lunch on Jul 23
+Sales Office Lunch	12 of 12		30	Eddie Troyer	Friday, June 12, 2026 at 10:36:00 AM		Lunch on Jul 23
+
+I want the highest ticket to start closing first. So in this case, it would be ticket 1 of 12 at $70. BUT, the next 2 high bids are ties at $50. When there is a tie, take the first ticket number, in this case 2 of 12 and then start closing 5 of 12. Then the next bid is 10 of 12 at $40. Then the next are all matching at 30, 3 of 12 first, then 11 of 12 and 12 of 12. BUT remember, with each bid on the currently closing item, you'll need to cascade the open bid down the chain
+
+   [Clarifying answers: Q1 Bids vs seats = "More bids than seats" (lowest bids
+    lose, a new bid pushes someone out of the 12). Q2 Cascade rule = "New bid
+    takes top, old cascades down" (displaced bid slides down the chain).]
+
+2. Commit everything you've worked on for now
+
+3. right now the default branch is claude/adoring-planck-ltbhfw . I want everything
+   merged down to main and I want those branches deleted, then I'll make main the
+   default again. What a mess
+
+   [Clarifying answer: epic-edison = "Drop it (delete, don't merge)" — it was an
+    abandoned parallel write-back; main already has write-back a different way.]

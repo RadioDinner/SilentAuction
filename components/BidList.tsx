@@ -8,6 +8,8 @@ interface Row {
   secondary: string;
   closed: boolean;
   closing: boolean;
+  /** Ranked below the group's seats — currently losing its seat. */
+  outbid?: boolean;
   /** High bidder shown as the winner once the row has closed. */
   winner?: string;
 }
@@ -44,14 +46,16 @@ export function BidList({
   for (const g of groups) {
     for (const t of g.tickets) {
       const closed = t.status === "closed";
+      const outbid = t.status === "outbid";
       rows.push({
         key: `t-${t.id}`,
         label: `${g.group} · #${t.label}`,
         bid: t.currentBid,
         closed,
         closing: t.status === "active",
+        outbid,
         winner: closed ? t.highBidder : undefined,
-        secondary: closed ? "" : formatClock(t.effectiveCloseISO, tz),
+        secondary: closed ? "" : outbid ? "outbid" : formatClock(t.effectiveCloseISO, tz),
       });
     }
   }
@@ -68,7 +72,7 @@ export function BidList({
           <div
             key={r.key}
             className={`flex break-inside-avoid items-baseline justify-between border-b border-white/5 py-0.5 ${
-              r.closed && !r.winner ? "opacity-45" : ""
+              (r.closed && !r.winner) || r.outbid ? "opacity-45" : ""
             }`}
           >
             <span className="truncate pr-3 text-base text-slate-100">{r.label}</span>

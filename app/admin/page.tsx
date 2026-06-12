@@ -38,6 +38,7 @@ function stateToData(s: AuctionState): AuctionData {
         highBidder: t.highBidder,
         lastBidISO: t.lastBidISO,
         cascadeStartISO: t.cascadeStartISO,
+        seats: t.seats,
       })),
     ),
   };
@@ -248,6 +249,29 @@ export default function AdminConsole() {
         ? { ...d, tickets: d.tickets.map((t) => (t.group === group ? { ...t, cascadeStartISO: iso } : t)) }
         : d,
     );
+  }
+  function setGroupSeats(group: string, seats?: number) {
+    setData((d) =>
+      d ? { ...d, tickets: d.tickets.map((t) => (t.group === group ? { ...t, seats } : t)) } : d,
+    );
+  }
+  // Append a fresh bid to a group — handy for testing more bids than seats.
+  function addTicketBid(group: string) {
+    setData((d) => {
+      if (!d) return d;
+      const inGroup = d.tickets.filter((t) => t.group === group);
+      const seed = inGroup[0];
+      const newTicket: AuctionData["tickets"][number] = {
+        group,
+        label: `new ${inGroup.length + 1}`,
+        currentBid: 0,
+        highBidder: "",
+        lastBidISO: new Date(previewNow).toISOString(),
+        cascadeStartISO: seed?.cascadeStartISO,
+        seats: seed?.seats,
+      };
+      return { ...d, tickets: [...d.tickets, newTicket] };
+    });
   }
   function updateConfig(patch: Partial<AuctionData["config"]>) {
     setData((d) => (d ? { ...d, config: { ...d.config, ...patch } } : d));
@@ -501,7 +525,26 @@ export default function AdminConsole() {
                 <div key={group} className="rounded-lg bg-black/20 p-2">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
                     <span className="font-bold">{group}</span>
-                    <label className="ml-auto text-xs text-slate-400">
+                    <button
+                      className={`${btn} ml-auto`}
+                      onClick={() => addTicketBid(group)}
+                      title="Add another bid to this group"
+                    >
+                      + Add bid
+                    </button>
+                    <label className="text-xs text-slate-400">
+                      Seats
+                      <input
+                        type="number"
+                        className={`${input} w-16`}
+                        placeholder="all"
+                        value={first?.seats ?? ""}
+                        onChange={(e) =>
+                          setGroupSeats(group, e.target.value === "" ? undefined : Number(e.target.value))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs text-slate-400">
                       Cascade start
                       <input
                         type="datetime-local"

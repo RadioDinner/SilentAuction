@@ -8,8 +8,9 @@
 /** Visual / logical status of a regular auction item. */
 export type ItemStatus = "open" | "closing" | "closed";
 
-/** Status of a single ticket within a ticket group's closing cascade. */
-export type TicketStatus = "pending" | "active" | "closed";
+/** Status of a single ticket within a ticket group's closing cascade.
+ *  "outbid" = ranked below the available seats, so it has lost its seat (for now). */
+export type TicketStatus = "pending" | "active" | "closed" | "outbid";
 
 /** Raw auction configuration (from the sheet's Config tab or demo data). */
 export interface AuctionConfig {
@@ -60,6 +61,10 @@ export interface TicketItem {
   /** Optional per-group cascade start (when the highest ticket closes). ISO.
    *  Set on any one row of the group; falls back to the global config value. */
   cascadeStartISO?: string;
+  /** Number of seats available in this group (e.g. 12). Set on any one row of
+   *  the group. The top `seats` bids hold a seat and close in the cascade; any
+   *  lower bids are "outbid". If unset, every bid wins a seat (no one is outbid). */
+  seats?: number;
 }
 
 /** Everything parsed out of the sheet (or demo source) before computation. */
@@ -96,11 +101,16 @@ export interface ComputedTicket extends TicketItem {
 export interface TicketGroupState {
   group: string;
   imageUrl?: string;
+  /** Tickets in cascade (close) order: winners first (by rank), then outbid. */
   tickets: ComputedTicket[];
+  /** Seats available in this group. */
+  seats: number;
   /** id of the currently-counting-down ticket, if any. */
   activeTicketId?: string;
-  /** Count still open (active + pending). */
+  /** Count still in the running for a seat (active + pending). */
   openCount: number;
+  /** Count of bids ranked below the seats (currently losing their seat). */
+  outbidCount: number;
 }
 
 /** The full state the API returns and the dashboard renders. */

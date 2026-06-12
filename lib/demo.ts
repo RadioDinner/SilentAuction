@@ -15,6 +15,7 @@ export function buildDemoData(nowMs: number): AuctionData {
     group: string,
     bids: Record<string, number>,
     startOffsetSec: number,
+    seats?: number,
   ): TicketItem[] =>
     Object.entries(bids).map(([label, bid], i) => ({
       group,
@@ -23,11 +24,13 @@ export function buildDemoData(nowMs: number): AuctionData {
       highBidder: `Paddle ${10 + i}`,
       lastBidISO: iso(-3 * MIN),
       cascadeStartISO: iso(startOffsetSec),
+      seats,
     }));
 
   const tickets: TicketItem[] = [
     // Closes soonest -> this group is the spotlight on the dashboard.
     ...makeGroup("Dinner Tickets", { "1 of 4": 60, "2 of 4": 45, "3 of 4": 40, "4 of 4": 35 }, 45),
+    // 10 seats but 12 bids -> the two lowest bids ($20, $22) show as "outbid".
     ...makeGroup(
       "Lunch Tickets",
       {
@@ -36,6 +39,7 @@ export function buildDemoData(nowMs: number): AuctionData {
         "9 of 12": 33, "10 of 12": 50, "11 of 12": 38, "12 of 12": 42,
       },
       150,
+      10,
     ),
     ...makeGroup("Fishing Trip", { "1 of 3": 120, "2 of 3": 120, "3 of 3": 100 }, 300),
   ];

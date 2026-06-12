@@ -40,7 +40,8 @@ export function DashboardView({
   }
   for (const g of state.ticketGroups) {
     for (const t of g.tickets) {
-      if (t.status === "closed") continue;
+      // Skip closed seats and outbid bids — neither is on the closing timeline.
+      if (t.status === "closed" || t.status === "outbid") continue;
       open.push({
         key: `t-${t.id}`,
         kind: "ticket",

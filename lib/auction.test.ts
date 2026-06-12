@@ -296,6 +296,69 @@ describe("computeTicketGroup uses per-row times as a bid-ordered schedule", () =
   });
 });
 
+describe("computeTicketGroup seats / outbid", () => {
+  it("with more bids than seats, the lowest-ranked bids are outbid", () => {
+    const tickets: TicketItem[] = [
+      { group: "Lunch", label: "1", currentBid: 50, seats: 2 },
+      { group: "Lunch", label: "2", currentBid: 40 },
+      { group: "Lunch", label: "3", currentBid: 30 },
+    ];
+    const now = ms("2026-06-11T17:59:00.000Z");
+    const g = computeTicketGroup("Lunch", tickets, baseConfig, now);
+
+    expect(g.seats).toBe(2);
+    expect(g.tickets.map((t) => t.status)).toEqual(["active", "pending", "outbid"]);
+    expect(g.openCount).toBe(2);
+    expect(g.outbidCount).toBe(1);
+    // The outbid ticket has no live countdown.
+    expect(g.tickets[2].secondsLeft).toBe(0);
+  });
+
+  it("when seats are unset, every bid wins a seat (nobody outbid)", () => {
+    const tickets: TicketItem[] = [
+      { group: "Lunch", label: "1", currentBid: 50 },
+      { group: "Lunch", label: "2", currentBid: 40 },
+    ];
+    const now = ms("2026-06-11T17:59:00.000Z");
+    const g = computeTicketGroup("Lunch", tickets, baseConfig, now);
+    expect(g.outbidCount).toBe(0);
+    expect(g.tickets.map((t) => t.status)).toEqual(["active", "pending"]);
+  });
+
+  it("a new high bid takes the top and cascades the old bid down, bumping the lowest out", () => {
+    // 12 seats, 12 winning bids -> nobody outbid yet.
+    const raw: Array<[string, number]> = [
+      ["1 of 12", 70], ["2 of 12", 50], ["3 of 12", 30], ["4 of 12", 20],
+      ["5 of 12", 50], ["6 of 12", 20], ["7 of 12", 20], ["8 of 12", 20],
+      ["9 of 12", 20], ["10 of 12", 40], ["11 of 12", 30], ["12 of 12", 30],
+    ];
+    const base: TicketItem[] = raw.map(([label, currentBid]) => ({
+      group: "Lunch",
+      label,
+      currentBid,
+      seats: 12,
+    }));
+    const now = ms("2026-06-11T17:59:00.000Z");
+    const before = computeTicketGroup("Lunch", base, baseConfig, now);
+    expect(before.outbidCount).toBe(0);
+    expect(before.activeTicketId).toBe("Lunch::1 of 12");
+
+    // A NEW $100 bid arrives on the closing item -> takes the top. Everyone
+    // cascades down one; the lowest seat ($20, ticket "9 of 12") drops to outbid.
+    const withNewBid: TicketItem[] = [
+      ...base,
+      { group: "Lunch", label: "13 of 12", currentBid: 100, seats: 12 },
+    ];
+    const after = computeTicketGroup("Lunch", withNewBid, baseConfig, now);
+
+    expect(after.activeTicketId).toBe("Lunch::13 of 12");
+    expect(after.openCount).toBe(12);
+    expect(after.outbidCount).toBe(1);
+    const outbid = after.tickets.find((t) => t.status === "outbid");
+    expect(outbid?.label).toBe("9 of 12"); // last of the $20 ties
+  });
+});
+
 describe("resolveFeaturedId", () => {
   const now = ms("2026-06-11T17:00:00.000Z");
   const items: RegularItem[] = [

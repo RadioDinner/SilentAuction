@@ -33,18 +33,34 @@ Time/Close/End/End Time; Last Bid Time/Last Bid/Bid Time/Timestamp.
 
 ## Tab 2: `Tickets` (groups of identical tickets)
 
-Each row is one ticket within a group. Tickets in a group close **one at a time,
-highest bid first**.
+Each row is **one bid** within a group. The group has a fixed number of **seats**
+(`Seats`). Bids are ranked **highest first**, and the top `Seats` bids hold a
+seat; any lower bids show as **Outbid**. Seats close one at a time, highest first.
+
+How ranking and closing behave:
+
+- **Highest bid closes first.** Ties are broken by **ticket number** (lowest
+  number first) — so *raising* a bid never changes a ticket's tie-break order.
+- **More bids than seats → lowest loses.** If a group has 12 seats and a 13th
+  bid comes in, add it as a new row; the lowest-ranked bid drops to **Outbid**.
+- **A new high bid takes the top, the old bid cascades down.** When someone
+  outbids the currently-closing seat, the new bid becomes the one closing and
+  the bid it beat slides down to fight for the next seat (and so on down the
+  chain). Re-derived live every refresh — there's no stored state.
+- **A bid extends the remaining seats.** A bid at the wire pushes the active
+  seat's close out by the anti-snipe window, which shifts every later seat out
+  by the same amount.
 
 | Column          | Required | Example         | Notes |
 |-----------------|----------|-----------------|-------|
 | `Group`         | no       | `Suite Tickets` | Defaults to `Tickets` if omitted. Tickets cascade within a group. |
-| `Label`         | yes      | `10 of 12`      | Shown as `#10 of 12`. |
+| `Label`         | yes      | `10 of 12`      | Shown as `#10 of 12`. Doubles as the tie-break order, so number them in order. |
+| `Seats`         | no       | `12`            | Seats available in this group. Set it on **one row** of the group. If blank, every bid wins a seat (no one is outbid). |
 | `Image URL`     | no       | `https://…`     | One image represents the group. |
 | `Starting Bid`  | no       | `20`            | Informational. |
 | `Current Bid`   | yes      | `50`            | Staff update this. |
 | `High Bidder`   | no       | `Paddle 19`     | |
-| `Cascade Start` | no       | `7:00 PM`       | When the **highest** ticket in this group closes. Set it on **one row** of the group (usually the first). Falls back to `Config.ticket_cascade_start`. |
+| `Cascade Start` | no       | `7:00 PM`       | When the **highest** ticket in this group closes. Set it on **one row** of the group (usually the first). Falls back to `Config.ticket_cascade_start`. Note: giving *each* row a different time switches the group to per-ticket close times instead of the bid-ranked cascade. |
 | `Last Bid Time` | auto     | (ISO)           | Stamped by the Apps Script. |
 | `Notes`         | no       | `Lunch on Jul 23` | Free text for your records (not shown on the dashboard). |
 
