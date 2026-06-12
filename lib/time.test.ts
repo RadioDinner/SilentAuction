@@ -43,6 +43,14 @@ describe("parseSheetTime — existing formats still work", () => {
     );
   });
 
+  it("parses the Apps Script stamp format (M/d/yyyy h:mm:ss AM/PM)", () => {
+    expect(parseSheetTime("6/11/2026 5:30:00 PM", EVENT_DATE, TZ)).toBe(expected530);
+  });
+
+  it("parses the Sheets default 24-hour datetime display", () => {
+    expect(parseSheetTime("6/11/2026 17:30:00", EVENT_DATE, TZ)).toBe(expected530);
+  });
+
   it("anchors a clock-only time to the event date", () => {
     expect(parseSheetTime("5:30 PM", EVENT_DATE, TZ)).toBe(expected530);
   });

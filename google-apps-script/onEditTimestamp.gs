@@ -3,7 +3,7 @@
  *
  * Whenever a staff member changes the "Current Bid" cell on the Items or
  * Tickets tab, this writes the current time into that row's "Last Bid Time"
- * column as an ISO timestamp (e.g. 2026-06-11T17:30:00-05:00). The dashboard
+ * column as a readable date-time (e.g. 6/12/2026 9:24:42 AM). The dashboard
  * uses that timestamp to drive the anti-snipe extension, so staff only ever
  * have to type the new bid (and bidder) — the clock takes care of itself.
  *
@@ -47,12 +47,16 @@ function onEdit(e) {
   var editedLastCol = editedFirstCol + e.range.getNumColumns() - 1;
   if (bidCol < editedFirstCol || bidCol > editedLastCol) return;
 
-  var tz = e.source.getSpreadsheetTimeZone() || 'America/Chicago';
-  var stamp = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  // A real date-time value (not text), shown like "6/12/2026 9:24:42 AM" — a
+  // format the dashboard parses. Sheets renders it in the spreadsheet's own
+  // timezone (File > Settings), so keep that matched to the event.
+  var now = new Date();
 
   // Stamp every row the edit spanned (usually just one).
   for (var r = row; r < row + e.range.getNumRows(); r++) {
-    sheet.getRange(r, stampCol).setValue(stamp);
+    var cell = sheet.getRange(r, stampCol);
+    cell.setValue(now);
+    cell.setNumberFormat('M/d/yyyy h:mm:ss AM/PM');
   }
 }
 

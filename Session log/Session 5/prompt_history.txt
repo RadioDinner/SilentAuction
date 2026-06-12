@@ -2,3 +2,7 @@ SESSION 5 — PROMPT HISTORY (verbatim)
 =====================================
 
 1. review session 4 and kick off session 5
+
+2. currently when I update the bid, it puts the time into column G as this
+   format 2026-06-12T09:24:42-07:00 [x12]. Can you change taht into something
+   more readable

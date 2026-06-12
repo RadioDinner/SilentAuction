@@ -31,7 +31,22 @@ b. CARRIED-OVER ITEMS CLOSED AT KICKOFF
      without Last Bid Time, so the onEdit Apps Script is optional. Noted
      that Last Bid Time is still honored when present (later of the two wins).
 
-c. STILL OPEN (user-side, can't be done from a session)
+c. READABLE "LAST BID TIME" STAMPS (user request)
+-------------------------------------------------
+- The onEdit Apps Script was stamping Last Bid Time as ISO text
+  ("2026-06-12T09:24:42-07:00"); the user wants it readable.
+- google-apps-script/onEditTimestamp.gs now writes a REAL date-time value
+  (setValue(new Date())) and sets the cell's number format to
+  'M/d/yyyy h:mm:ss AM/PM', so it displays like "6/12/2026 9:24:42 AM".
+  Being a real date-time, the user can re-format/sort it in Sheets freely.
+- The app reads cells as FORMATTED_VALUE; parseSheetTime already accepts
+  "M/d/yyyy h:mm:ss a" (and the Sheets default 24h "M/d/yyyy H:mm:ss" if the
+  user changes the cell format). +2 tests in lib/time.test.ts -> 65 pass.
+- Docs updated (SHEET_TEMPLATE.md examples). NOTE FOR USER: paste the updated
+  .gs into the sheet's Apps Script editor to pick up the change; existing ISO
+  values in the column still parse fine and can be left alone.
+
+d. STILL OPEN (user-side, can't be done from a session)
 -------------------------------------------------------
   - In the REAL Google Sheet: give the Wings spectator ticket its own Group
     name (separate batch); keep group spellings consistent; set the Seats

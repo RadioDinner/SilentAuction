@@ -22,7 +22,7 @@ accepted), but the names below are the recommended ones.
 | `Current Bid`   | no       | `1500`                 | Staff update this. `$`/commas OK. |
 | `High Bidder`   | no       | `Paddle 42`            | Name or paddle number. |
 | `Close Time`    | yes      | `5:30 PM`              | Scheduled close (see time formats below). |
-| `Last Bid Time` | auto     | `2026-06-11T17:30:00-05:00` | Stamped by the Apps Script. Leave blank otherwise. |
+| `Last Bid Time` | auto     | `6/11/2026 5:30:00 PM` | Stamped by the Apps Script. Leave blank otherwise. |
 | `Featured`      | no       | `TRUE`                 | Force this item into the hero slot. |
 
 **Accepted header synonyms** include: ID/Item/Lot/Number; Name/Title; Image/Photo;
@@ -116,5 +116,6 @@ to `event_date`) or a full date-time:
 - `2026-06-11 17:30`, `6/11/2026 5:30 PM`
 - Full ISO `2026-06-11T17:30:00-05:00`
 
-`Last Bid Time` is normally written by the Apps Script as ISO and you don't
-touch it. If you ever enter a bid time by hand, any of the formats above work.
+`Last Bid Time` is normally written by the Apps Script as a date-time like
+`6/11/2026 5:30:00 PM` and you don't touch it. If you ever enter a bid time by
+hand, any of the formats above work.
