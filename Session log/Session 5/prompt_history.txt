@@ -6,3 +6,11 @@ SESSION 5 — PROMPT HISTORY (verbatim)
 2. currently when I update the bid, it puts the time into column G as this
    format 2026-06-12T09:24:42-07:00 [x12]. Can you change taht into something
    more readable
+
+3. It'll occasionally give me this message "Connected to the sheet but found
+   no items or tickets. Check that tabs are named exactly Items / Tickets /
+   Config with headers in row 1. Visit /api/diag for details." then go back to
+   the live data from the sheet. Why? This is the /api/diag. How do I fix this?
+   [pasted /api/diag output: ok:false, error: "Quota exceeded for quota metric
+   'Read requests' and limit 'Read requests per minute per user' of service
+   'sheets.googleapis.com'..."]

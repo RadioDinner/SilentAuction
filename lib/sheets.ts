@@ -7,6 +7,7 @@ import type { AuctionData, RegularItem, TicketItem } from "./types";
 import { norm, parseConfig } from "./config";
 import { parseSheetTime } from "./time";
 import { normalizePrivateKey } from "./private-key";
+import { createCachedFetcher } from "./sheet-cache";
 import {
   planConfigWrites,
   planItemWrites,
@@ -45,6 +46,12 @@ function sheetsClient(scope: "read" | "write" = "read") {
   return google.sheets({ version: "v4", auth });
 }
 
+/** A missing/renamed tab — the one read error treated as "empty tab". */
+function isMissingTabError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /unable to parse range/i.test(message);
+}
+
 async function readTab(
   client: ReturnType<typeof sheetsClient>,
   spreadsheetId: string,
@@ -58,9 +65,40 @@ async function readTab(
       dateTimeRenderOption: "FORMATTED_STRING",
     });
     return (res.data.values as Row[]) ?? [];
-  } catch {
-    // A missing optional tab (e.g. no Tickets) shouldn't sink everything.
-    return [];
+  } catch (err) {
+    // A missing optional tab (e.g. no Tickets) shouldn't sink everything, but
+    // real failures (quota, auth, network) must surface — swallowing them here
+    // made a rate-limited read look like an empty sheet.
+    if (isMissingTabError(err)) return [];
+    throw err;
+  }
+}
+
+/**
+ * Read several tabs in ONE Sheets API call (batchGet) — the per-minute read
+ * quota is 60/user, so one call instead of three per poll matters.
+ */
+async function readTabs(
+  client: ReturnType<typeof sheetsClient>,
+  spreadsheetId: string,
+  tabs: string[],
+): Promise<Row[][]> {
+  try {
+    const res = await client.spreadsheets.values.batchGet({
+      spreadsheetId,
+      ranges: tabs,
+      valueRenderOption: "FORMATTED_VALUE",
+      dateTimeRenderOption: "FORMATTED_STRING",
+    });
+    const byRange = res.data.valueRanges ?? [];
+    return tabs.map((_, i) => (byRange[i]?.values as Row[]) ?? []);
+  } catch (err) {
+    // One missing tab fails the whole batch; fall back to per-tab reads so an
+    // optional tab doesn't sink the rest.
+    if (isMissingTabError(err)) {
+      return Promise.all(tabs.map((t) => readTab(client, spreadsheetId, t)));
+    }
+    throw err;
   }
 }
 
@@ -188,10 +226,10 @@ export async function getAuctionDataFromSheet(): Promise<AuctionData> {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID!;
   const client = sheetsClient();
 
-  const [itemRows, ticketRows, configRows] = await Promise.all([
-    readTab(client, spreadsheetId, ITEMS_TAB),
-    readTab(client, spreadsheetId, TICKETS_TAB),
-    readTab(client, spreadsheetId, CONFIG_TAB),
+  const [itemRows, ticketRows, configRows] = await readTabs(client, spreadsheetId, [
+    ITEMS_TAB,
+    TICKETS_TAB,
+    CONFIG_TAB,
   ]);
 
   const config = parseConfig(parseConfigRows(configRows));
@@ -199,6 +237,38 @@ export async function getAuctionDataFromSheet(): Promise<AuctionData> {
   const tickets = parseTickets(ticketRows, config.eventDateISO, config.timezone);
 
   return { config, items, tickets };
+}
+
+const SHEET_CACHE_SECONDS = Number(process.env.SHEET_CACHE_SECONDS) || 3;
+
+const fetchCachedSheet = createCachedFetcher(
+  getAuctionDataFromSheet,
+  SHEET_CACHE_SECONDS * 1000,
+);
+
+export interface AuctionSnapshot {
+  data: AuctionData;
+  /** When the data was actually read from Google (epoch ms). */
+  fetchedAtMs: number;
+  /** Set when the latest read failed and `data` is the last good snapshot. */
+  staleError?: string;
+}
+
+/**
+ * Cached, coalesced sheet read for the polling endpoints: every dashboard
+ * polling within SHEET_CACHE_SECONDS shares one Sheets API call, which keeps
+ * us far under Google's 60-reads/min quota no matter how many screens are
+ * open. If Google errors (e.g. quota), the last good snapshot is served with
+ * `staleError` set instead of throwing. Returns a fresh deep copy per call —
+ * callers mutate the data. (Per server instance, like bid-memory.)
+ */
+export async function getAuctionSnapshot(nowMs = Date.now()): Promise<AuctionSnapshot> {
+  const res = await fetchCachedSheet(nowMs);
+  return {
+    data: structuredClone(res.value),
+    fetchedAtMs: res.fetchedAtMs,
+    staleError: res.staleError,
+  };
 }
 
 export interface SheetDiagnostics {
@@ -257,10 +327,10 @@ export async function getDiagnostics(): Promise<SheetDiagnostics> {
       .map((s) => s.properties?.title ?? "")
       .filter(Boolean);
 
-    const [itemRows, ticketRows, configRows] = await Promise.all([
-      readTab(client, sheetId, ITEMS_TAB),
-      readTab(client, sheetId, TICKETS_TAB),
-      readTab(client, sheetId, CONFIG_TAB),
+    const [itemRows, ticketRows, configRows] = await readTabs(client, sheetId, [
+      ITEMS_TAB,
+      TICKETS_TAB,
+      CONFIG_TAB,
     ]);
     const config = parseConfig(parseConfigRows(configRows));
     const items = parseItems(itemRows, config.eventDateISO, config.timezone);
@@ -297,6 +367,9 @@ export async function getDiagnostics(): Promise<SheetDiagnostics> {
       hint = "The GOOGLE_SHEET_ID looks wrong — no spreadsheet with that ID. Copy the part between /d/ and /edit in the sheet URL.";
     } else if (/permission|forbidden|403/i.test(message)) {
       hint = `The sheet isn't shared with the service account. Share it (Viewer) with ${serviceAccountEmail}.`;
+    } else if (/quota/i.test(message)) {
+      hint =
+        "Google's per-minute read quota was hit; it resets within a minute. The app caches sheet reads server-side and keeps showing the last good data during these blips, so this is harmless — re-check /api/diag in a minute.";
     } else if (/invalid_grant|DECODER|PEM|private key|invalid.*key/i.test(message)) {
       hint =
         "GOOGLE_PRIVATE_KEY is malformed. In the Vercel field, paste ONLY the private_key value from the JSON (the -----BEGIN…END----- block with its \\n sequences) — no surrounding quotes. Then redeploy.";
@@ -344,10 +417,10 @@ export async function applyAuctionWrites(
   const spreadsheetId = process.env.GOOGLE_SHEET_ID!;
   const client = sheetsClient("write");
 
-  const [itemRows, ticketRows, configRows] = await Promise.all([
-    readTab(client, spreadsheetId, ITEMS_TAB),
-    readTab(client, spreadsheetId, TICKETS_TAB),
-    readTab(client, spreadsheetId, CONFIG_TAB),
+  const [itemRows, ticketRows, configRows] = await readTabs(client, spreadsheetId, [
+    ITEMS_TAB,
+    TICKETS_TAB,
+    CONFIG_TAB,
   ]);
 
   // Config drives timezone / event date used to format and compare times.

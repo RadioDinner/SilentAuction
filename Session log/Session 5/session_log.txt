@@ -46,7 +46,38 @@ c. READABLE "LAST BID TIME" STAMPS (user request)
   .gs into the sheet's Apps Script editor to pick up the change; existing ISO
   values in the column still parse fine and can be left alone.
 
-d. STILL OPEN (user-side, can't be done from a session)
+d. SHEETS API QUOTA FIX ("found no items or tickets" flicker)
+-------------------------------------------------------------
+ROOT CAUSE (user hit it live, /api/diag showed "Quota exceeded ... Read
+requests per minute per user"): Google allows 60 reads/min per service
+account. The dashboard polls /api/state every 3s and each poll made THREE
+values.get calls (Items/Tickets/Config) = 60/min from ONE open browser; a
+second screen (TV + laptop, or /admin) tipped it over. Worse, readTab()
+swallowed ALL read errors and returned [], so a rate-limited read looked
+like an EMPTY SHEET -> the misleading "no items or tickets" banner until
+the quota window reset.
+
+FIX (three layers):
+  1. lib/sheets.ts readTabs(): ONE values.batchGet for all three tabs
+     (3x fewer API calls). Falls back to per-tab reads only when a tab is
+     missing ("Unable to parse range"), which is the one error still
+     treated as an empty tab; quota/auth/network errors now THROW.
+  2. lib/sheet-cache.ts createCachedFetcher(): TTL cache + in-flight
+     coalescing. getAuctionSnapshot() in sheets.ts serves every poller a
+     deep copy of one shared read per SHEET_CACHE_SECONDS (env, default 3s)
+     -> ~20 API calls/min per server instance NO MATTER how many screens.
+     On a failed refresh it serves the last good snapshot with staleError
+     instead of throwing (no demo-data flash mid-event).
+  3. app/api/state/route.ts: a staleError only surfaces a warning if the
+     snapshot being shown is >60s old; brief quota blips self-heal silently.
+     /api/diag now has a quota-specific hint.
++6 tests (lib/sheet-cache.test.ts) -> 71 pass; tsc + build clean.
+Caveats: cache is per server instance (same as bid-memory; Vercel may run
+several, each capped independently — still far under quota). Bid increases
+are observed when a fresh read lands, so an extension can start up to
+SHEET_CACHE_SECONDS late (3s vs the 60s window — negligible).
+
+e. STILL OPEN (user-side, can't be done from a session)
 -------------------------------------------------------
   - In the REAL Google Sheet: give the Wings spectator ticket its own Group
     name (separate batch); keep group spellings consistent; set the Seats

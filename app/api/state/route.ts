@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { cascadeItemCloses, computeState, normalizeConfig, planItemCascadeWriteback } from "@/lib/auction";
 import { buildDemoData } from "@/lib/demo";
-import { applyAuctionWrites, getAuctionDataFromSheet, hasSheetCredentials } from "@/lib/sheets";
+import { applyAuctionWrites, getAuctionSnapshot, hasSheetCredentials } from "@/lib/sheets";
 import { observeBid } from "@/lib/bid-memory";
 import type { AuctionData, AuctionState } from "@/lib/types";
 
@@ -51,9 +51,19 @@ export async function GET(req: NextRequest) {
     state = computeState(data, now, "demo", warning);
   } else {
     try {
-      const data = await getAuctionDataFromSheet();
+      // Cached + coalesced: all viewers share one Sheets API call per few
+      // seconds (Google's read quota is 60/min); a failed refresh serves the
+      // last good snapshot with staleError set instead of throwing.
+      const { data, fetchedAtMs, staleError } = await getAuctionSnapshot(now);
       let warn: string | undefined;
-      if (data.items.length === 0 && data.tickets.length === 0) {
+      if (staleError) {
+        // A brief blip (e.g. a quota hiccup) self-heals — only warn once the
+        // data we're showing is genuinely old.
+        const ageSec = Math.round((now - fetchedAtMs) / 1000);
+        if (ageSec > 60) {
+          warn = `Live sheet reads are failing (${staleError}) — showing data from ${ageSec}s ago.`;
+        }
+      } else if (data.items.length === 0 && data.tickets.length === 0) {
         warn =
           "Connected to the sheet but found no items or tickets. Check that tabs are named exactly Items / Tickets / Config with headers in row 1. Visit /api/diag for details.";
       } else if (data.items.length === 0) {
