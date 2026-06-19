@@ -1,0 +1,7 @@
+SESSION 6 — PROMPT HISTORY (verbatim)
+=====================================
+
+1. lets kick off another session from our last one today
+
+2. merge everything you have currently to main and continue committing
+   directly to main for the rest of the session
